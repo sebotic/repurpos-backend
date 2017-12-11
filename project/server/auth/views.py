@@ -13,7 +13,8 @@ import wikidataintegrator as wdi
 auth_blueprint = Blueprint('auth', __name__)
 
 
-assay_data = pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/reframe_short_20170822.csv')
+assay_data = \
+    pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/reframe_short_20170822.csv')
 gvk_dt = pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/gvk_data_to_release.csv')
 
 
@@ -34,7 +35,6 @@ def get_assay_data(qid):
         # for k in x.keys():
         #     tmp_obj.update({k: x[k]})
 
-
         # only return the data really necessary for being rendered
         datamode = x['datamode']
 
@@ -46,7 +46,6 @@ def get_assay_data(qid):
             tmp_obj.update({'activity_type': 'EC50'})
         elif datamode == 'SUPER_ACTIVE':
             tmp_obj.update({'activity_type': 'SUPER ACTIVE'})
-
 
         tmp_obj.update({'ac50': round(x['ac50'], 10)})
         tmp_obj.update({'assay_title': x['assay_title']})
@@ -88,7 +87,6 @@ def get_gvk_data(qid):
     return ad
 
 
-
 class RegisterAPI(MethodView):
     """
     User Registration Resource
@@ -97,8 +95,10 @@ class RegisterAPI(MethodView):
     def post(self):
         # get the post data
         post_data = request.get_json()
-        print('thats the post data', post_data, request.values)
 
+        # here, one needs to check with the Google ReCaptcha API whether ReCaptcha was sucessfully solved.
+        # what would also be needed here is some kind of delay when a certain IP makes too many requests to either
+        # signup oder login.
 
         # check if user already exists
         user = User.query.filter_by(email=post_data.get('email')).first()
@@ -180,7 +180,7 @@ class UserAPI(MethodView):
         auth_header = request.headers.get('Authorization')
         if auth_header:
             try:
-                auth_token = auth_header.split(" ")[1]
+                auth_token = auth_header.split(" ")[0]
             except IndexError:
                 responseObject = {
                     'status': 'fail',
@@ -309,12 +309,61 @@ class AssayDataAPI(MethodView):
             return make_response(jsonify(responseObject)), 401
 
 
+class GVKDataAPI(MethodView):
+    """
+    GVKData resource
+    """
+
+    def __init__(self):
+        pass
+
+    def get(self):
+        # get the auth token
+        auth_header = request.headers.get('Authorization')
+
+        print(auth_header)
+        args = request.args
+        qid = args['qid']
+
+        if auth_header:
+            try:
+                auth_token = auth_header.split(" ")[0]
+            except IndexError:
+                responseObject = {
+                    'status': 'fail',
+                    'message': 'Bearer token malformed.'
+                }
+                return make_response(jsonify(responseObject)), 401
+        else:
+            auth_token = ''
+        if auth_token:
+            resp = User.decode_auth_token(auth_token)
+            if not isinstance(resp, str):
+                user = User.query.filter_by(id=resp).first()
+                if user.id:
+                    responseObject = get_gvk_data(qid)
+
+                    return make_response(jsonify(responseObject)), 200
+            responseObject = {
+                'status': 'fail',
+                'message': resp
+            }
+            return make_response(jsonify(responseObject)), 401
+        else:
+            responseObject = {
+                'status': 'fail',
+                'message': 'Provide a valid auth token.'
+            }
+            return make_response(jsonify(responseObject)), 401
+
+
 # define the API resources
 registration_view = RegisterAPI.as_view('register_api')
 login_view = LoginAPI.as_view('login_api')
 user_view = UserAPI.as_view('user_api')
 logout_view = LogoutAPI.as_view('logout_api')
 assay_data_view = AssayDataAPI.as_view('assay_data_api')
+gvk_data_view = GVKDataAPI.as_view('gvk_data_api')
 
 # add Rules for API Endpoints
 auth_blueprint.add_url_rule(
@@ -340,5 +389,10 @@ auth_blueprint.add_url_rule(
 auth_blueprint.add_url_rule(
     '/assaydata',
     view_func=assay_data_view,
+    methods=['GET'],
+)
+auth_blueprint.add_url_rule(
+    '/gvk_data',
+    view_func=gvk_data_view,
     methods=['GET'],
 )

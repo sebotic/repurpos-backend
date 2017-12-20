@@ -9,6 +9,8 @@ from project.server.models import User, BlacklistToken
 
 import pandas as pd
 import wikidataintegrator as wdi
+import requests
+import os
 
 auth_blueprint = Blueprint('auth', __name__)
 
@@ -99,6 +101,29 @@ class RegisterAPI(MethodView):
         # here, one needs to check with the Google ReCaptcha API whether ReCaptcha was sucessfully solved.
         # what would also be needed here is some kind of delay when a certain IP makes too many requests to either
         # signup oder login.
+
+        recaptcha_token = post_data.get('recaptcha_token')
+        params = {
+            'secret': os.getenv('RECAPTCHA_SECRET_KEY'),
+            'response': recaptcha_token
+        }
+
+        r = requests.post('https://www.google.com/recaptcha/api/siteverify', params=params).json()
+        print(r)
+
+        try:
+            if not r['success']:
+                response_object = {
+                    'status': 'fail',
+                    'message': 'ReCaptcha token could not be verified!'
+                }
+                return make_response(jsonify(response_object)), 401
+        except KeyError:
+            response_object = {
+                'status': 'fail',
+                'message': 'Some error occurred verifying ReCaptcha'
+            }
+            return make_response(jsonify(response_object)), 401
 
         # check if user already exists
         user = User.query.filter_by(email=post_data.get('email')).first()
@@ -224,7 +249,7 @@ class LogoutAPI(MethodView):
         # get auth token
         auth_header = request.headers.get('Authorization')
         if auth_header:
-            auth_token = auth_header.split(" ")[1]
+            auth_token = auth_header.split(" ")[0]
         else:
             auth_token = ''
         if auth_token:

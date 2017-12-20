@@ -18,6 +18,7 @@ auth_blueprint = Blueprint('auth', __name__)
 assay_data = \
     pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/reframe_short_20170822.csv')
 gvk_dt = pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/gvk_data_to_release.csv')
+integrity_dt = pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/integrity_annot_20171220.csv')
 
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
@@ -58,7 +59,6 @@ def get_assay_data(qid):
         tmp_obj.update({'inchi_key': x['inchi_key']})
         tmp_obj.update({'ref': 'Calibr'})
 
-
         ad.append(tmp_obj)
 
     return ad
@@ -68,21 +68,29 @@ def get_gvk_data(qid):
     ikey = wd_ikey_map[qid]
     print(ikey)
 
-    tmp_dt = gvk_dt.loc[gvk_dt['ikey'] == ikey, :]
-
     ad = list()
 
-    for c, x in tmp_dt.iterrows():
-        tmp_obj = dict()
+    for c, x in gvk_dt.loc[gvk_dt['ikey'] == ikey, :].iterrows():
+        tmp_obj = {
+            'drug_name': x['drug_name'],
+            'phase': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['phase'].split('; ')] if pd.notnull(x['phase']) else [],
+            'drug_roa': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['drug_roa'].split('; ')] if pd.notnull(x['drug_roa']) else [],
+            'category': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['category'].split('; ')] if pd.notnull(x['category']) else [],
+            'mechanism': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['mechanism'].split('; ')] if pd.notnull(x['mechanism']) else [],
+            'synonyms': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['synonyms'].split('; ')] if pd.notnull(x['synonyms']) else [],
+            'sub_smiles': x['sub_smiles'],
+        }
 
-        tmp_obj.update({'drug_name': x['drug_name']})
-        tmp_obj.update({'phase': x['phase'].split('; ')})
-        tmp_obj.update({'drug_roa': x['drug_roa'].split('; ')})
-        tmp_obj.update({'category': x['category'].split('; ')})
-        tmp_obj.update({'mechanism': x['mechanism'].split('; ')})
-        tmp_obj.update({'synonyms': x['synonyms'].split('; ')})
-        tmp_obj.update({'sub_smiles': x['sub_smiles']})
-        tmp_obj.update({'ref': 'GVK'})
+        for cc, i in integrity_dt.loc[integrity_dt['ikey'] == ikey, :].iterrows():
+            if pd.notnull(i['status']):
+                tmp_obj['phase'].extend(
+                    [{'label': y, 'qid': '', 'ref': 'Integrity'} for y in i['status'].split('; ')])
+            if pd.notnull(i['int_thera_group']):
+                tmp_obj['category'].extend(
+                    [{'label': y, 'qid': '', 'ref': 'Integrity'} for y in i['int_thera_group'].split('; ')])
+            if pd.notnull(i['int_MoA']):
+                tmp_obj['mechanism'].extend(
+                    [{'label': y, 'qid': '', 'ref': 'Integrity'} for y in i['int_MoA'].split('; ')])
 
         ad.append(tmp_obj)
 

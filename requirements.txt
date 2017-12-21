@@ -22,3 +22,5 @@ six
 SQLAlchemy
 Werkzeug
 wikidataintegrator
+requests
+pandas

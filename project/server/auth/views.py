@@ -18,8 +18,11 @@ auth_blueprint = Blueprint('auth', __name__)
 assay_data = \
     pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/reframe_short_20170822.csv')
 gvk_dt = pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/gvk_data_to_release.csv')
-integrity_dt = pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/integrity_annot_20171220.csv')
+integrity_dt = \
+    pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/integrity_annot_20171220.csv')
 
+informa_dt = \
+    pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/informa_annot_20171220.csv')
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 wd_ikey_map = dict(zip(ikey_wd_map.values(), ikey_wd_map.keys()))
@@ -92,7 +95,20 @@ def get_gvk_data(qid):
                 tmp_obj['mechanism'].extend(
                     [{'label': y, 'qid': '', 'ref': 'Integrity'} for y in i['int_MoA'].split('; ')])
 
+        for cc, i in informa_dt.loc[informa_dt['ikey'] == ikey, :].iterrows():
+            if pd.notnull(i['Global Status']):
+                tmp_obj['phase'].extend(
+                    [{'label': y, 'qid': '', 'ref': 'Informa'} for y in i['Global Status'].split('; ')])
+            # if pd.notnull(i['int_thera_group']):
+                # tmp_obj['category'].extend(
+                #     [{'label': y, 'qid': '', 'ref': 'Informa'} for y in i['int_thera_group'].split('; ')])
+            if pd.notnull(i['Mechanism Of Action']):
+                tmp_obj['mechanism'].extend(
+                    [{'label': y, 'qid': '', 'ref': 'Informa'} for y in i['Mechanism Of Action'].split('; ')])
+
         ad.append(tmp_obj)
+
+    print(ad)
 
     return ad
 

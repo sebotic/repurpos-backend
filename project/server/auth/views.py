@@ -14,15 +14,16 @@ import os
 
 auth_blueprint = Blueprint('auth', __name__)
 
+data_dir = os.getenv('DATA_DIR')
 
 assay_data = \
-    pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/reframe_short_20170822.csv')
-gvk_dt = pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/gvk_data_to_release.csv')
+    pd.read_csv(data_dir + 'reframe_short_20170822.csv')
+gvk_dt = pd.read_csv(data_dir + 'gvk_data_to_release.csv')
 integrity_dt = \
-    pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/integrity_annot_20171220.csv')
+    pd.read_csv(data_dir + 'integrity_annot_20171220.csv')
 
 informa_dt = \
-    pd.read_csv('/Users/sebastianburgstaller/Documents/jupyter-notebooks/calibr_data/informa_annot_20171220.csv')
+    pd.read_csv(data_dir + 'informa_annot_20171220.csv')
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 wd_ikey_map = dict(zip(ikey_wd_map.values(), ikey_wd_map.keys()))

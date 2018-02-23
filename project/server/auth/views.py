@@ -25,6 +25,10 @@ integrity_dt = \
 informa_dt = \
     pd.read_csv(data_dir + 'informa_annot_20171220.csv')
 
+assay_descrip = pd.read_csv(data_dir + '20180222_assay_descriptions.csv')
+
+plot_data = pd.read_csv(data_dir + '20180222_EC50_DATA_RFM_IDs.csv')
+
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 wd_ikey_map = dict(zip(ikey_wd_map.values(), ikey_wd_map.keys()))
 
@@ -112,6 +116,58 @@ def get_gvk_data(qid):
     print(ad)
 
     return ad
+
+# --- LDH ---
+def get_assay_details(assay_id):
+    organisms = ['C. parvum', 'C. hominis', 'M. tuberculosis', 'Wolbachia', 'P. falciparum', 'Cryptosporidium', 'in vitro', 'in vivo', 'Mycobacterium tuberculosis', 'M. smegmatis']
+    # def
+    filtered = assay_descrip[assay_descrip.assay_id == assay_id].reset_index()
+
+    # format the text
+    filtered.assay_type = filtered.assay_type.apply(lambda x: x.lower())
+    filtered.detection_method = filtered.detection_method.apply(lambda x: x.lower())
+    filtered.drug_conc = filtered.drug_conc.apply(lambda x: x.replace('uM', ' µM'))
+
+    return filtered
+
+
+def get_assay_list():
+    assays = []
+
+    for idx, assay in assay_descrip.sort_values(['indication', 'assay_type', 'title']).iterrows():
+        temp = {
+        'assay_id': assay.assay_id,
+        'title': assay.title,
+        'indication': assay.indication,
+        'assay_type': assay.assay_type,
+        'summary':  assay.summary
+        }
+
+        assays.append(temp)
+
+    return assays
+
+
+def get_dotplot_data(aid):
+    assay_data = []
+    filtered = plot_data.loc[plot_data['id'] == aid]
+
+    for idx, cmpd in filtered.iterrows():
+        temp = {
+        'assay_id': cmpd.id,
+        'cmpd_name': cmpd.ID,
+        'ac50': cmpd.ac50,
+        'datamode': cmpd.datamode,
+        'efficacy': cmpd.efficacy,
+        'r_sq': cmpd.rsquared
+        }
+
+        assay_data.append(temp)
+
+    return assay_data
+
+# print(assay_data.head())
+get_dotplot_data('A00215')
 
 
 class RegisterAPI(MethodView):
@@ -359,6 +415,7 @@ class AssayDataAPI(MethodView):
             return make_response(jsonify(responseObject)), 401
 
 
+
 class GVKDataAPI(MethodView):
     """
     GVKData resource
@@ -406,6 +463,83 @@ class GVKDataAPI(MethodView):
             }
             return make_response(jsonify(responseObject)), 401
 
+# --- LDH ---
+class AssayListAPI(MethodView):
+    """
+    Assay list resource
+    """
+
+    def __init__(self):
+        pass
+
+    def get(self):
+        responseObject = get_assay_list()
+
+        return make_response(jsonify(responseObject)), 200
+
+# TODO: need a check if data returns something?
+class AssayDetailsAPI(MethodView):
+    """
+    Assay description resource
+    """
+
+    def __init__(self):
+        pass
+
+    def get(self):
+        args = request.args
+        aid = args['aid']
+
+        responseObject = get_assay_details(aid)
+        return make_response(responseObject.to_json(orient="records")), 200
+
+class PlotDataAPI(MethodView):
+    """
+    Assay list resource
+    """
+
+    def __init__(self):
+        pass
+
+    def get(self):
+        # get the auth token
+        auth_header = request.headers.get('Authorization')
+
+        print(auth_header)
+        args = request.args
+        aid = args['aid']
+
+        if auth_header:
+            try:
+                auth_token = auth_header.split(" ")[0]
+            except IndexError:
+                responseObject = {
+                    'status': 'fail',
+                    'message': 'Bearer token malformed.'
+                }
+                return make_response(jsonify(responseObject)), 401
+        else:
+            auth_token = ''
+        if auth_token:
+            resp = User.decode_auth_token(auth_token)
+            if not isinstance(resp, str):
+                user = User.query.filter_by(id=resp).first()
+                if user.id:
+                    responseObject = get_dotplot_data(aid)
+
+                    return make_response(jsonify(responseObject)), 200
+            responseObject = {
+                'status': 'fail',
+                'message': resp
+            }
+            return make_response(jsonify(responseObject)), 401
+        else:
+            responseObject = {
+                'status': 'fail',
+                'message': 'Provide a valid auth token.'
+            }
+            return make_response(jsonify(responseObject)), 401
+
 
 # define the API resources
 registration_view = RegisterAPI.as_view('register_api')
@@ -414,6 +548,10 @@ user_view = UserAPI.as_view('user_api')
 logout_view = LogoutAPI.as_view('logout_api')
 assay_data_view = AssayDataAPI.as_view('assay_data_api')
 gvk_data_view = GVKDataAPI.as_view('gvk_data_api')
+# --- LDH ---
+assay_list_view = AssayListAPI.as_view('assay_list_api')
+assay_details_view = AssayDetailsAPI.as_view('assay_details_api')
+plot_data_view = PlotDataAPI.as_view('plot_data_api')
 
 # add Rules for API Endpoints
 auth_blueprint.add_url_rule(
@@ -444,5 +582,21 @@ auth_blueprint.add_url_rule(
 auth_blueprint.add_url_rule(
     '/gvk_data',
     view_func=gvk_data_view,
+    methods=['GET'],
+)
+# --- assay lists (LDH) ---
+auth_blueprint.add_url_rule(
+    '/assay_list',
+    view_func=assay_list_view,
+    methods=['GET'],
+)
+auth_blueprint.add_url_rule(
+    '/assay_details',
+    view_func=assay_details_view,
+    methods=['GET'],
+)
+auth_blueprint.add_url_rule(
+    '/assaydata_plot',
+    view_func=plot_data_view,
     methods=['GET'],
 )

@@ -34,6 +34,19 @@ Set a SECRET_KEY:
 $ export SECRET_KEY="change_me"
 ```
 
+Set the secret key for your Google ReCaptcha:
+
+```sh
+$ export RECAPTCHA_SECRET_KEY="change_me"
+```
+
+Set the secret key for your Google ReCaptcha:
+
+```sh
+$ export DATA_DIR="directory_with_data_files"
+```
+
+
 ### Create DB
 
 Create the databases in `psql`:

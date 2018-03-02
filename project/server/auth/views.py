@@ -12,18 +12,21 @@ import wikidataintegrator as wdi
 import requests
 import os
 
+from elasticsearch import Elasticsearch
+from elasticsearch.exceptions import RequestError
+es = Elasticsearch()
+
+from data.example_data import example_data
+
 auth_blueprint = Blueprint('auth', __name__)
 
 data_dir = os.getenv('DATA_DIR')
 
-assay_data = \
-    pd.read_csv(data_dir + 'reframe_short_20170822.csv')
+assay_data = pd.read_csv(data_dir + 'reframe_short_20170822.csv')
 gvk_dt = pd.read_csv(data_dir + 'gvk_data_to_release.csv')
-integrity_dt = \
-    pd.read_csv(data_dir + 'integrity_annot_20171220.csv')
+integrity_dt = pd.read_csv(data_dir + 'integrity_annot_20171220.csv')
 
-informa_dt = \
-    pd.read_csv(data_dir + 'informa_annot_20171220.csv')
+informa_dt = pd.read_csv(data_dir + 'informa_annot_20171220.csv')
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 wd_ikey_map = dict(zip(ikey_wd_map.values(), ikey_wd_map.keys()))
@@ -407,6 +410,121 @@ class GVKDataAPI(MethodView):
             return make_response(jsonify(responseObject)), 401
 
 
+class SearchAPI(MethodView):
+    """
+    Search with elasticsearch
+    """
+
+    def __init__(self):
+        pass
+
+    def get(self):
+        # get the auth token
+        auth_header = request.headers.get('Authorization')
+
+        print(auth_header)
+        args = request.args
+        search_term = args['search']
+
+        body = {
+            "from": 0, "size": 100,
+            "query": {
+                "query_string": {
+
+                    "query": "{}*".format(search_term)
+                }
+            }
+        }
+
+        try:
+
+            res = es.search(index="reframe", body=body)
+        except Exception as e:
+            return make_response(jsonify({'status': 'fail', 'ikeys': []})), 500
+
+        ikeys = []
+        for x in res['hits']['hits']:
+            ikeys.append(x['_id'])
+
+        responseObject = {
+            'status': 'success',
+            'ikeys': ikeys
+        }
+
+        return make_response(jsonify(responseObject)), 200
+
+
+
+
+        if auth_header:
+            try:
+                auth_token = auth_header.split(" ")[0]
+            except IndexError:
+                responseObject = {
+                    'status': 'fail',
+                    'message': 'Bearer token malformed.'
+                }
+                return make_response(jsonify(responseObject)), 401
+        else:
+            auth_token = ''
+        if auth_token:
+            resp = User.decode_auth_token(auth_token)
+            if not isinstance(resp, str):
+                user = User.query.filter_by(id=resp).first()
+                if user.id:
+                    responseObject = get_gvk_data(qid)
+
+                    return make_response(jsonify(responseObject)), 200
+            responseObject = {
+                'status': 'fail',
+                'message': resp
+            }
+            return make_response(jsonify(responseObject)), 401
+        else:
+            responseObject = {
+                'status': 'fail',
+                'message': 'Provide a valid auth token.'
+            }
+            return make_response(jsonify(responseObject)), 401
+
+
+class DataAPI(MethodView):
+    """
+    GVKData resource
+    """
+
+    def __init__(self):
+        pass
+
+    def get(self):
+        # get the auth token
+        auth_header = request.headers.get('Authorization')
+
+        print(auth_header)
+        args = request.args
+        qid = args['qid']
+        ikey = wd_ikey_map[qid]
+        print(qid, ikey)
+
+        try:
+            res = es.get(index="reframe", doc_type='compound', id=ikey)
+        except Exception as e:
+            if qid in example_data:
+                response_object = {qid: example_data[qid], "status": "success"}
+                return make_response(jsonify(response_object)), 200
+            else:
+                return make_response(jsonify({'status': 'fail', 'ikeys': []})), 500
+
+
+        responseObject = {
+            'status': 'success',
+            qid: res['_source']
+        }
+
+        return make_response(jsonify(responseObject)), 200
+
+
+
 # define the API resources
 registration_view = RegisterAPI.as_view('register_api')
 login_view = LoginAPI.as_view('login_api')
@@ -414,6 +532,8 @@ user_view = UserAPI.as_view('user_api')
 logout_view = LogoutAPI.as_view('logout_api')
 assay_data_view = AssayDataAPI.as_view('assay_data_api')
 gvk_data_view = GVKDataAPI.as_view('gvk_data_api')
+search_view = SearchAPI.as_view('search_api')
+data_view = DataAPI.as_view('data_api')
 
 # add Rules for API Endpoints
 auth_blueprint.add_url_rule(
@@ -444,5 +564,15 @@ auth_blueprint.add_url_rule(
 auth_blueprint.add_url_rule(
     '/gvk_data',
     view_func=gvk_data_view,
+    methods=['GET'],
+)
+auth_blueprint.add_url_rule(
+    '/search',
+    view_func=search_view,
+    methods=['GET'],
+)
+auth_blueprint.add_url_rule(
+    '/data',
+    view_func=data_view,
     methods=['GET'],
 )

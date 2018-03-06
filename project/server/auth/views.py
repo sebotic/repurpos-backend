@@ -4,6 +4,8 @@
 from flask import Blueprint, request, make_response, jsonify, session
 from flask.views import MethodView
 
+import json as json
+
 from project.server import bcrypt, db
 from project.server.models import User, BlacklistToken
 
@@ -27,7 +29,7 @@ informa_dt = \
 
 assay_descrip = pd.read_csv(data_dir + '20180222_assay_descriptions.csv')
 
-plot_data = pd.read_csv(data_dir + '20180222_EC50_DATA_RFM_IDs.csv')
+plot_data = pd.read_csv(data_dir + '20180222_EC50_DATA_RFM_IDs_cpy.csv')
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 wd_ikey_map = dict(zip(ikey_wd_map.values(), ikey_wd_map.keys()))
@@ -149,25 +151,60 @@ def get_assay_list():
 
 
 def get_dotplot_data(aid):
-    assay_data = []
-    filtered = plot_data.loc[plot_data['id'] == aid]
+    def find_type(datamode):
+        if(datamode.lower() == 'decreasing'):
+            return 'IC'
+        elif(datamode.lower() == 'increasing'):
+            return 'EC'
+        else:
+            return 'unknown'
 
+    def find_name(row):
+        if(pd.isnull(row.pubchem_label)):
+            return row.ID
+        else:
+            return row.pubchem_label
+
+    def find_cmpdlink(wikidata_id, url_stub = "/#/compound_data/"):
+          # URL stub for individual compound page, e.g. https://repurpos.us/#/compound_data/Q10859697
+        if(wikidata_id):
+            return url_stub + wikidata_id
+
+
+    assay_data = []
+    # filter out data: selected assay, valid AC50 value
+    filtered = plot_data.copy()[(plot_data['id'] == aid) & (plot_data['ac50'])]
+
+    filtered['assay_type'] = filtered.datamode.apply(find_type)
+    filtered = filtered.loc[filtered['assay_type'] != 'unknown'] # remove weird data modes
+
+    filtered['url'] = filtered.wikidata.apply(find_cmpdlink)
+    filtered['name'] = filtered.apply(find_name, axis = 1)
+
+    # group by unique ID and nest.
+    # fncns = ['count', 'min', 'max', 'mean']
+    # filtered = filtered.groupby(['ID']).agg(fncns)
+
+    # sort values
+    filtered = filtered.sort_values('ac50')
+
+    # convert to the proper json-able structure
     for idx, cmpd in filtered.iterrows():
         temp = {
-        'assay_id': cmpd.id,
-        'cmpd_name': cmpd.ID,
+        'assay_title': cmpd.assay_title,
+        'calibr_id': cmpd.calibr_id,
+        'name': cmpd.pc,
         'ac50': cmpd.ac50,
-        'datamode': cmpd.datamode,
+        'assay_type': cmpd.assay_type,
         'efficacy': cmpd.efficacy,
-        'r_sq': cmpd.rsquared
+        'r_sq': cmpd.rsquared,
+        'pubchem_id': cmpd['PubChem CID'],
+        'url': cmpd.url
         }
 
         assay_data.append(temp)
 
     return assay_data
-
-# print(assay_data.head())
-get_dotplot_data('A00215')
 
 
 class RegisterAPI(MethodView):
@@ -526,6 +563,32 @@ class PlotDataAPI(MethodView):
                 user = User.query.filter_by(id=resp).first()
                 if user.id:
                     responseObject = get_dotplot_data(aid)
+
+# !! WARNING: jsonify can't handle NaN, since JSON hates NaN.
+
+                    # responseObject = [{
+                    #     "ac50": 1.25e-08,
+                    #     "assay_title": "Crypto-C. parvum HCI proliferation assay - Wild Cp",
+                    #     "assay_type": "IC",
+                    #     "efficacy": -104.54743959999999,
+                    #     "name": "drug891",
+                    #     "pubchem_id": "CID2722",
+                    #     "r_sq": 0.9641395209999999,
+                    #     "test": "test",
+                    #     "url": "/#/compound_data/Q239569"
+                    # },
+                    #     {
+                    #     "ac50": 4.5199999999999994e-08,
+                    #     "assay_title": "Crypto-C. parvum HCI proliferation assay - Wild Cp",
+                    #     "assay_type": "IC",
+                    #     "efficacy": -100.0,
+                    #     "name": "drug888",
+                    #     "pubchem_id": "CID2722",
+                    #     "r_sq": 0.682526052,
+                    #     "test": "test",
+                    #     "url": "/#/compound_data/Q239569"
+                    # }]
+
 
                     return make_response(jsonify(responseObject)), 200
             responseObject = {

@@ -108,7 +108,7 @@ for c, x in gvk_dt.iterrows():
     if pd.isnull(ikey):
         continue
 
-    tmp_obj = copy.copy(reframe_doc)
+    tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
 
     for k, v in gvk_doc_map.items():
@@ -140,7 +140,7 @@ for c, x in integrity_dt.iterrows():
     if pd.isnull(ikey):
         continue
 
-    tmp_obj = copy.copy(reframe_doc)
+    tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
 
     for k, v in integrity_doc_map.items():
@@ -172,7 +172,7 @@ for c, x in informa_dt.iterrows():
     if pd.isnull(ikey):
         continue
 
-    tmp_obj = copy.copy(reframe_doc)
+    tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
 
     for k, v in informa_doc_map.items():

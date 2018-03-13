@@ -4,6 +4,8 @@
 from flask import Blueprint, request, make_response, jsonify, session
 from flask.views import MethodView
 
+import json as json
+
 from project.server import bcrypt, db
 from project.server.models import User, BlacklistToken
 
@@ -20,6 +22,11 @@ from data.example_data import example_data
 
 auth_blueprint = Blueprint('auth', __name__)
 
+
+assay_descrip = pd.read_csv(data_dir + '20180222_assay_descriptions.csv')
+
+plot_data = pd.read_csv(data_dir + '20180222_EC50_DATA_RFM_IDs_cpy.csv')
+
 # data_dir = os.getenv('DATA_DIR')
 #
 # assay_data = pd.read_csv(data_dir + 'reframe_short_20170822.csv')
@@ -28,6 +35,7 @@ auth_blueprint = Blueprint('auth', __name__)
 #
 # informa_dt = pd.read_csv(data_dir + 'informa_annot_20171220.csv')
 #
+
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 wd_ikey_map = dict(zip(ikey_wd_map.values(), ikey_wd_map.keys()))
 
@@ -115,6 +123,93 @@ print('wd ikey map length:', len(wd_ikey_map))
 #     print(ad)
 #
 #     return ad
+
+# --- LDH ---
+def get_assay_details(assay_id):
+    organisms = ['C. parvum', 'C. hominis', 'M. tuberculosis', 'Wolbachia', 'P. falciparum', 'Cryptosporidium', 'in vitro', 'in vivo', 'Mycobacterium tuberculosis', 'M. smegmatis']
+    # def
+    filtered = assay_descrip[assay_descrip.assay_id == assay_id].reset_index()
+
+    # format the text
+    filtered.assay_type = filtered.assay_type.apply(lambda x: x.lower())
+    filtered.detection_method = filtered.detection_method.apply(lambda x: x.lower())
+    filtered.drug_conc = filtered.drug_conc.apply(lambda x: x.replace('uM', ' µM'))
+
+    return filtered
+
+
+def get_assay_list():
+    assays = []
+
+    for idx, assay in assay_descrip.sort_values(['indication', 'assay_type', 'title']).iterrows():
+        temp = {
+        'assay_id': assay.assay_id,
+        'title': assay.title,
+        'indication': assay.indication,
+        'assay_type': assay.assay_type,
+        'summary':  assay.summary
+        }
+
+        assays.append(temp)
+
+    return assays
+
+
+def get_dotplot_data(aid):
+    def find_type(datamode):
+        if(datamode.lower() == 'decreasing'):
+            return 'IC'
+        elif(datamode.lower() == 'increasing'):
+            return 'EC'
+        else:
+            return 'unknown'
+
+    def find_name(row):
+        if(pd.isnull(row.pubchem_label)):
+            return row.ID
+        else:
+            return row.pubchem_label
+
+    def find_cmpdlink(wikidata_id, url_stub = "/#/compound_data/"):
+          # URL stub for individual compound page, e.g. https://repurpos.us/#/compound_data/Q10859697
+        if(wikidata_id):
+            return url_stub + wikidata_id
+
+
+    assay_data = []
+    # filter out data: selected assay, valid AC50 value
+    filtered = plot_data.copy()[(plot_data['id'] == aid) & (plot_data['ac50'])]
+
+    filtered['assay_type'] = filtered.datamode.apply(find_type)
+    filtered = filtered.loc[filtered['assay_type'] != 'unknown'] # remove weird data modes
+
+    filtered['url'] = filtered.wikidata.apply(find_cmpdlink)
+    filtered['name'] = filtered.apply(find_name, axis = 1)
+
+    # group by unique ID and nest.
+    # fncns = ['count', 'min', 'max', 'mean']
+    # filtered = filtered.groupby(['ID']).agg(fncns)
+
+    # sort values
+    filtered = filtered.sort_values('ac50')
+
+    # convert to the proper json-able structure
+    for idx, cmpd in filtered.iterrows():
+        temp = {
+        'assay_title': cmpd.assay_title,
+        'calibr_id': cmpd.calibr_id,
+        'name': cmpd.pc,
+        'ac50': cmpd.ac50,
+        'assay_type': cmpd.assay_type,
+        'efficacy': cmpd.efficacy,
+        'r_sq': cmpd.rsquared,
+        'pubchem_id': cmpd['PubChem CID'],
+        'url': cmpd.url
+        }
+
+        assay_data.append(temp)
+
+    return assay_data
 
 
 class RegisterAPI(MethodView):
@@ -488,9 +583,10 @@ class SearchAPI(MethodView):
             return make_response(jsonify(responseObject)), 401
 
 
+
 class DataAPI(MethodView):
     """
-    GVKData resource
+    Data resource
     """
 
     def __init__(self):
@@ -524,12 +620,122 @@ class DataAPI(MethodView):
         return make_response(jsonify(responseObject)), 200
 
 
+# --- LDH ---
+class AssayListAPI(MethodView):
+    """
+    Assay list resource
+    """
+
+    def __init__(self):
+        pass
+
+    def get(self):
+        responseObject = get_assay_list()
+
+        return make_response(jsonify(responseObject)), 200
+
+# TODO: need a check if data returns something?
+class AssayDetailsAPI(MethodView):
+    """
+    Assay description resource
+    """
+
+    def __init__(self):
+        pass
+
+    def get(self):
+        args = request.args
+        aid = args['aid']
+
+        responseObject = get_assay_details(aid)
+        return make_response(responseObject.to_json(orient="records")), 200
+
+class PlotDataAPI(MethodView):
+    """
+    Assay list resource
+    """
+
+    def __init__(self):
+        pass
+
+    def get(self):
+        # get the auth token
+        auth_header = request.headers.get('Authorization')
+
+        print(auth_header)
+        args = request.args
+        aid = args['aid']
+
+        if auth_header:
+            try:
+                auth_token = auth_header.split(" ")[0]
+            except IndexError:
+                responseObject = {
+                    'status': 'fail',
+                    'message': 'Bearer token malformed.'
+                }
+                return make_response(jsonify(responseObject)), 401
+        else:
+            auth_token = ''
+        if auth_token:
+            resp = User.decode_auth_token(auth_token)
+            if not isinstance(resp, str):
+                user = User.query.filter_by(id=resp).first()
+                if user.id:
+                    responseObject = get_dotplot_data(aid)
+
+# !! WARNING: jsonify can't handle NaN, since JSON hates NaN.
+
+                    # responseObject = [{
+                    #     "ac50": 1.25e-08,
+                    #     "assay_title": "Crypto-C. parvum HCI proliferation assay - Wild Cp",
+                    #     "assay_type": "IC",
+                    #     "efficacy": -104.54743959999999,
+                    #     "name": "drug891",
+                    #     "pubchem_id": "CID2722",
+                    #     "r_sq": 0.9641395209999999,
+                    #     "test": "test",
+                    #     "url": "/#/compound_data/Q239569"
+                    # },
+                    #     {
+                    #     "ac50": 4.5199999999999994e-08,
+                    #     "assay_title": "Crypto-C. parvum HCI proliferation assay - Wild Cp",
+                    #     "assay_type": "IC",
+                    #     "efficacy": -100.0,
+                    #     "name": "drug888",
+                    #     "pubchem_id": "CID2722",
+                    #     "r_sq": 0.682526052,
+                    #     "test": "test",
+                    #     "url": "/#/compound_data/Q239569"
+                    # }]
+
+
+                    return make_response(jsonify(responseObject)), 200
+            responseObject = {
+                'status': 'fail',
+                'message': resp
+            }
+            return make_response(jsonify(responseObject)), 401
+        else:
+            responseObject = {
+                'status': 'fail',
+                'message': 'Provide a valid auth token.'
+            }
+            return make_response(jsonify(responseObject)), 401
+
 
 # define the API resources
 registration_view = RegisterAPI.as_view('register_api')
 login_view = LoginAPI.as_view('login_api')
 user_view = UserAPI.as_view('user_api')
 logout_view = LogoutAPI.as_view('logout_api')
+
+# --- LDH ---
+assay_list_view = AssayListAPI.as_view('assay_list_api')
+assay_details_view = AssayDetailsAPI.as_view('assay_details_api')
+plot_data_view = PlotDataAPI.as_view('plot_data_api')
+# -----------
+
 # assay_data_view = AssayDataAPI.as_view('assay_data_api')
 # gvk_data_view = GVKDataAPI.as_view('gvk_data_api')
 search_view = SearchAPI.as_view('search_api')
@@ -574,5 +780,21 @@ auth_blueprint.add_url_rule(
 auth_blueprint.add_url_rule(
     '/data',
     view_func=data_view,
+    methods=['GET'],
+)
+# --- assay lists (LDH) ---
+auth_blueprint.add_url_rule(
+    '/assay_list',
+    view_func=assay_list_view,
+    methods=['GET'],
+)
+auth_blueprint.add_url_rule(
+    '/assay_details',
+    view_func=assay_details_view,
+    methods=['GET'],
+)
+auth_blueprint.add_url_rule(
+    '/assaydata_plot',
+    view_func=plot_data_view,
     methods=['GET'],
 )

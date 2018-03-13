@@ -24,9 +24,9 @@ auth_blueprint = Blueprint('auth', __name__)
 
 data_dir = os.getenv('DATA_DIR')
 
-assay_descrip = pd.read_csv(data_dir + '20180222_assay_descriptions.csv')
+assay_descrip = pd.read_csv(data_dir + '20180222_assay_descriptions.csv', header=True)
 
-plot_data = pd.read_csv(data_dir + '20180222_EC50_DATA_RFM_IDs_cpy.csv')
+plot_data = pd.read_csv(data_dir + '20180222_EC50_DATA_RFM_IDs_cpy.csv', header=True)
 
 #
 # assay_data = pd.read_csv(data_dir + 'reframe_short_20170822.csv')
@@ -145,11 +145,11 @@ def get_assay_list():
 
     for idx, assay in assay_descrip.sort_values(['indication', 'assay_type', 'title']).iterrows():
         temp = {
-        'assay_id': assay['assay_id'],
-        'title': assay['title'],
-        'indication': assay['indication'],
-        'assay_type': assay['assay_type'],
-        'summary':  assay['summary']
+            'assay_id': assay['assay_id'],
+            'title': assay['title'],
+            'indication': assay['indication'],
+            'assay_type': assay['assay_type'],
+            'summary':  assay['summary']
         }
 
         assays.append(temp)

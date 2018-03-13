@@ -8,7 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True)
 
 app_settings = os.getenv(
     'APP_SETTINGS',
@@ -21,3 +21,6 @@ db = SQLAlchemy(app)
 
 from project.server.auth.views import auth_blueprint
 app.register_blueprint(auth_blueprint)
+
+# needed so gunicorn will find the app
+application = app

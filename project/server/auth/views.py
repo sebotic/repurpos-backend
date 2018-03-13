@@ -14,110 +14,115 @@ import wikidataintegrator as wdi
 import requests
 import os
 
+from elasticsearch import Elasticsearch
+from elasticsearch.exceptions import RequestError
+es = Elasticsearch()
+
+from data.example_data import example_data
+
 auth_blueprint = Blueprint('auth', __name__)
 
-data_dir = os.getenv('DATA_DIR')
-
-assay_data = \
-    pd.read_csv(data_dir + 'reframe_short_20170822.csv')
-gvk_dt = pd.read_csv(data_dir + 'gvk_data_to_release.csv')
-integrity_dt = \
-    pd.read_csv(data_dir + 'integrity_annot_20171220.csv')
-
-informa_dt = \
-    pd.read_csv(data_dir + 'informa_annot_20171220.csv')
 
 assay_descrip = pd.read_csv(data_dir + '20180222_assay_descriptions.csv')
 
 plot_data = pd.read_csv(data_dir + '20180222_EC50_DATA_RFM_IDs_cpy.csv')
 
+# data_dir = os.getenv('DATA_DIR')
+#
+# assay_data = pd.read_csv(data_dir + 'reframe_short_20170822.csv')
+# gvk_dt = pd.read_csv(data_dir + 'gvk_data_to_release.csv')
+# integrity_dt = pd.read_csv(data_dir + 'integrity_annot_20171220.csv')
+#
+# informa_dt = pd.read_csv(data_dir + 'informa_annot_20171220.csv')
+#
+
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 wd_ikey_map = dict(zip(ikey_wd_map.values(), ikey_wd_map.keys()))
 
 print('wd ikey map length:', len(wd_ikey_map))
-
-
-def get_assay_data(qid):
-    tmp_dt = assay_data.loc[assay_data['wikidata'] == qid, :]
-
-    ad = list()
-
-    for c, x in tmp_dt.iterrows():
-        tmp_obj = dict()
-
-        # for k in x.keys():
-        #     tmp_obj.update({k: x[k]})
-
-        # only return the data really necessary for being rendered
-        datamode = x['datamode']
-
-        if datamode not in ['DECREASING', 'INCREASING', 'SUPER_ACTIVE']:
-            continue
-        elif datamode == 'DECREASING':
-            tmp_obj.update({'activity_type': 'IC50'})
-        elif datamode == 'INCREASING':
-            tmp_obj.update({'activity_type': 'EC50'})
-        elif datamode == 'SUPER_ACTIVE':
-            tmp_obj.update({'activity_type': 'SUPER ACTIVE'})
-
-        tmp_obj.update({'ac50': round(x['ac50'], 10)})
-        tmp_obj.update({'assay_title': x['assay_title']})
-        tmp_obj.update({'smiles': x['smiles']})
-        tmp_obj.update({'PubChem CID': str(x['PubChem CID'])})
-        tmp_obj.update({'wikidata': x['wikidata']})
-        tmp_obj.update({'calibr_id': x['calibr_id']})
-        tmp_obj.update({'inchi_key': x['inchi_key']})
-        tmp_obj.update({'ref': 'Calibr'})
-
-        ad.append(tmp_obj)
-
-    return ad
-
-
-def get_gvk_data(qid):
-    ikey = wd_ikey_map[qid]
-    print(ikey)
-
-    ad = list()
-
-    for c, x in gvk_dt.loc[gvk_dt['ikey'] == ikey, :].iterrows():
-        tmp_obj = {
-            'drug_name': x['drug_name'],
-            'phase': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['phase'].split('; ')] if pd.notnull(x['phase']) else [],
-            'drug_roa': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['drug_roa'].split('; ')] if pd.notnull(x['drug_roa']) else [],
-            'category': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['category'].split('; ')] if pd.notnull(x['category']) else [],
-            'mechanism': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['mechanism'].split('; ')] if pd.notnull(x['mechanism']) else [],
-            'synonyms': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['synonyms'].split('; ')] if pd.notnull(x['synonyms']) else [],
-            'sub_smiles': x['sub_smiles'],
-        }
-
-        for cc, i in integrity_dt.loc[integrity_dt['ikey'] == ikey, :].iterrows():
-            if pd.notnull(i['status']):
-                tmp_obj['phase'].extend(
-                    [{'label': y, 'qid': '', 'ref': 'Integrity'} for y in i['status'].split('; ')])
-            if pd.notnull(i['int_thera_group']):
-                tmp_obj['category'].extend(
-                    [{'label': y, 'qid': '', 'ref': 'Integrity'} for y in i['int_thera_group'].split('; ')])
-            if pd.notnull(i['int_MoA']):
-                tmp_obj['mechanism'].extend(
-                    [{'label': y, 'qid': '', 'ref': 'Integrity'} for y in i['int_MoA'].split('; ')])
-
-        for cc, i in informa_dt.loc[informa_dt['ikey'] == ikey, :].iterrows():
-            if pd.notnull(i['Global Status']):
-                tmp_obj['phase'].extend(
-                    [{'label': y, 'qid': '', 'ref': 'Informa'} for y in i['Global Status'].split('; ')])
-            # if pd.notnull(i['int_thera_group']):
-                # tmp_obj['category'].extend(
-                #     [{'label': y, 'qid': '', 'ref': 'Informa'} for y in i['int_thera_group'].split('; ')])
-            if pd.notnull(i['Mechanism Of Action']):
-                tmp_obj['mechanism'].extend(
-                    [{'label': y, 'qid': '', 'ref': 'Informa'} for y in i['Mechanism Of Action'].split('; ')])
-
-        ad.append(tmp_obj)
-
-    print(ad)
-
-    return ad
+#
+#
+# def get_assay_data(qid):
+#     tmp_dt = assay_data.loc[assay_data['wikidata'] == qid, :]
+#
+#     ad = list()
+#
+#     for c, x in tmp_dt.iterrows():
+#         tmp_obj = dict()
+#
+#         # for k in x.keys():
+#         #     tmp_obj.update({k: x[k]})
+#
+#         # only return the data really necessary for being rendered
+#         datamode = x['datamode']
+#
+#         if datamode not in ['DECREASING', 'INCREASING', 'SUPER_ACTIVE']:
+#             continue
+#         elif datamode == 'DECREASING':
+#             tmp_obj.update({'activity_type': 'IC50'})
+#         elif datamode == 'INCREASING':
+#             tmp_obj.update({'activity_type': 'EC50'})
+#         elif datamode == 'SUPER_ACTIVE':
+#             tmp_obj.update({'activity_type': 'SUPER ACTIVE'})
+#
+#         tmp_obj.update({'ac50': round(x['ac50'], 10)})
+#         tmp_obj.update({'assay_title': x['assay_title']})
+#         tmp_obj.update({'smiles': x['smiles']})
+#         tmp_obj.update({'PubChem CID': str(x['PubChem CID'])})
+#         tmp_obj.update({'wikidata': x['wikidata']})
+#         tmp_obj.update({'calibr_id': x['calibr_id']})
+#         tmp_obj.update({'inchi_key': x['inchi_key']})
+#         tmp_obj.update({'ref': 'Calibr'})
+#
+#         ad.append(tmp_obj)
+#
+#     return ad
+#
+#
+# def get_gvk_data(qid):
+#     ikey = wd_ikey_map[qid]
+#     print(ikey)
+#
+#     ad = list()
+#
+#     for c, x in gvk_dt.loc[gvk_dt['ikey'] == ikey, :].iterrows():
+#         tmp_obj = {
+#             'drug_name': x['drug_name'],
+#             'phase': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['phase'].split('; ')] if pd.notnull(x['phase']) else [],
+#             'drug_roa': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['drug_roa'].split('; ')] if pd.notnull(x['drug_roa']) else [],
+#             'category': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['category'].split('; ')] if pd.notnull(x['category']) else [],
+#             'mechanism': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['mechanism'].split('; ')] if pd.notnull(x['mechanism']) else [],
+#             'synonyms': [{'label': y, 'qid': '', 'ref': 'GVK'} for y in x['synonyms'].split('; ')] if pd.notnull(x['synonyms']) else [],
+#             'sub_smiles': x['sub_smiles'],
+#         }
+#
+#         for cc, i in integrity_dt.loc[integrity_dt['ikey'] == ikey, :].iterrows():
+#             if pd.notnull(i['status']):
+#                 tmp_obj['phase'].extend(
+#                     [{'label': y, 'qid': '', 'ref': 'Integrity'} for y in i['status'].split('; ')])
+#             if pd.notnull(i['int_thera_group']):
+#                 tmp_obj['category'].extend(
+#                     [{'label': y, 'qid': '', 'ref': 'Integrity'} for y in i['int_thera_group'].split('; ')])
+#             if pd.notnull(i['int_MoA']):
+#                 tmp_obj['mechanism'].extend(
+#                     [{'label': y, 'qid': '', 'ref': 'Integrity'} for y in i['int_MoA'].split('; ')])
+#
+#         for cc, i in informa_dt.loc[informa_dt['ikey'] == ikey, :].iterrows():
+#             if pd.notnull(i['Global Status']):
+#                 tmp_obj['phase'].extend(
+#                     [{'label': y, 'qid': '', 'ref': 'Informa'} for y in i['Global Status'].split('; ')])
+#             # if pd.notnull(i['int_thera_group']):
+#                 # tmp_obj['category'].extend(
+#                 #     [{'label': y, 'qid': '', 'ref': 'Informa'} for y in i['int_thera_group'].split('; ')])
+#             if pd.notnull(i['Mechanism Of Action']):
+#                 tmp_obj['mechanism'].extend(
+#                     [{'label': y, 'qid': '', 'ref': 'Informa'} for y in i['Mechanism Of Action'].split('; ')])
+#
+#         ad.append(tmp_obj)
+#
+#     print(ad)
+#
+#     return ad
 
 # --- LDH ---
 def get_assay_details(assay_id):
@@ -404,9 +409,105 @@ class LogoutAPI(MethodView):
             return make_response(jsonify(responseObject)), 403
 
 
-class AssayDataAPI(MethodView):
+# class AssayDataAPI(MethodView):
+#     """
+#     Assaydata resource
+#     """
+#
+#     def __init__(self):
+#         pass
+#
+#     def get(self):
+#         # get the auth token
+#         auth_header = request.headers.get('Authorization')
+#
+#         print(auth_header)
+#         args = request.args
+#         qid = args['qid']
+#
+#         if auth_header:
+#             try:
+#                 auth_token = auth_header.split(" ")[0]
+#             except IndexError:
+#                 responseObject = {
+#                     'status': 'fail',
+#                     'message': 'Bearer token malformed.'
+#                 }
+#                 return make_response(jsonify(responseObject)), 401
+#         else:
+#             auth_token = ''
+#         if auth_token:
+#             resp = User.decode_auth_token(auth_token)
+#             if not isinstance(resp, str):
+#                 user = User.query.filter_by(id=resp).first()
+#                 if user.id:
+#                     responseObject = get_assay_data(qid)
+#
+#                     return make_response(jsonify(responseObject)), 200
+#             responseObject = {
+#                 'status': 'fail',
+#                 'message': resp
+#             }
+#             return make_response(jsonify(responseObject)), 401
+#         else:
+#             responseObject = {
+#                 'status': 'fail',
+#                 'message': 'Provide a valid auth token.'
+#             }
+#             return make_response(jsonify(responseObject)), 401
+#
+#
+# class GVKDataAPI(MethodView):
+#     """
+#     GVKData resource
+#     """
+#
+#     def __init__(self):
+#         pass
+#
+#     def get(self):
+#         # get the auth token
+#         auth_header = request.headers.get('Authorization')
+#
+#         print(auth_header)
+#         args = request.args
+#         qid = args['qid']
+#
+#         if auth_header:
+#             try:
+#                 auth_token = auth_header.split(" ")[0]
+#             except IndexError:
+#                 responseObject = {
+#                     'status': 'fail',
+#                     'message': 'Bearer token malformed.'
+#                 }
+#                 return make_response(jsonify(responseObject)), 401
+#         else:
+#             auth_token = ''
+#         if auth_token:
+#             resp = User.decode_auth_token(auth_token)
+#             if not isinstance(resp, str):
+#                 user = User.query.filter_by(id=resp).first()
+#                 if user.id:
+#                     responseObject = get_gvk_data(qid)
+#
+#                     return make_response(jsonify(responseObject)), 200
+#             responseObject = {
+#                 'status': 'fail',
+#                 'message': resp
+#             }
+#             return make_response(jsonify(responseObject)), 401
+#         else:
+#             responseObject = {
+#                 'status': 'fail',
+#                 'message': 'Provide a valid auth token.'
+#             }
+#             return make_response(jsonify(responseObject)), 401
+
+
+class SearchAPI(MethodView):
     """
-    Assaydata resource
+    Search with elasticsearch
     """
 
     def __init__(self):
@@ -418,56 +519,37 @@ class AssayDataAPI(MethodView):
 
         print(auth_header)
         args = request.args
-        qid = args['qid']
+        search_term = args['search']
 
-        if auth_header:
-            try:
-                auth_token = auth_header.split(" ")[0]
-            except IndexError:
-                responseObject = {
-                    'status': 'fail',
-                    'message': 'Bearer token malformed.'
+        body = {
+            "from": 0, "size": 100,
+            "query": {
+                "query_string": {
+
+                    "query": "{}*".format(search_term)
                 }
-                return make_response(jsonify(responseObject)), 401
-        else:
-            auth_token = ''
-        if auth_token:
-            resp = User.decode_auth_token(auth_token)
-            if not isinstance(resp, str):
-                user = User.query.filter_by(id=resp).first()
-                if user.id:
-                    responseObject = get_assay_data(qid)
-
-                    return make_response(jsonify(responseObject)), 200
-            responseObject = {
-                'status': 'fail',
-                'message': resp
             }
-            return make_response(jsonify(responseObject)), 401
-        else:
-            responseObject = {
-                'status': 'fail',
-                'message': 'Provide a valid auth token.'
-            }
-            return make_response(jsonify(responseObject)), 401
+        }
+
+        try:
+
+            res = es.search(index="reframe", body=body)
+        except Exception as e:
+            return make_response(jsonify({'status': 'fail', 'ikeys': []})), 500
+
+        ikeys = []
+        for x in res['hits']['hits']:
+            ikeys.append(x['_id'])
+
+        responseObject = {
+            'status': 'success',
+            'ikeys': ikeys
+        }
+
+        return make_response(jsonify(responseObject)), 200
 
 
 
-class GVKDataAPI(MethodView):
-    """
-    GVKData resource
-    """
-
-    def __init__(self):
-        pass
-
-    def get(self):
-        # get the auth token
-        auth_header = request.headers.get('Authorization')
-
-        print(auth_header)
-        args = request.args
-        qid = args['qid']
 
         if auth_header:
             try:
@@ -499,6 +581,44 @@ class GVKDataAPI(MethodView):
                 'message': 'Provide a valid auth token.'
             }
             return make_response(jsonify(responseObject)), 401
+
+
+
+class DataAPI(MethodView):
+    """
+    Data resource
+    """
+
+    def __init__(self):
+        pass
+
+    def get(self):
+        # get the auth token
+        auth_header = request.headers.get('Authorization')
+
+        print(auth_header)
+        args = request.args
+        qid = args['qid']
+        ikey = wd_ikey_map[qid]
+        print(qid, ikey)
+
+        try:
+            res = es.get(index="reframe", doc_type='compound', id=ikey)
+        except Exception as e:
+            if qid in example_data:
+                response_object = {qid: example_data[qid], "status": "success"}
+                return make_response(jsonify(response_object)), 200
+            else:
+                return make_response(jsonify({'status': 'fail', 'ikeys': []})), 500
+
+
+        responseObject = {
+            'status': 'success',
+            qid: res['_source']
+        }
+
+        return make_response(jsonify(responseObject)), 200
+
 
 # --- LDH ---
 class AssayListAPI(MethodView):
@@ -609,12 +729,17 @@ registration_view = RegisterAPI.as_view('register_api')
 login_view = LoginAPI.as_view('login_api')
 user_view = UserAPI.as_view('user_api')
 logout_view = LogoutAPI.as_view('logout_api')
-assay_data_view = AssayDataAPI.as_view('assay_data_api')
-gvk_data_view = GVKDataAPI.as_view('gvk_data_api')
+
 # --- LDH ---
 assay_list_view = AssayListAPI.as_view('assay_list_api')
 assay_details_view = AssayDetailsAPI.as_view('assay_details_api')
 plot_data_view = PlotDataAPI.as_view('plot_data_api')
+# -----------
+
+# assay_data_view = AssayDataAPI.as_view('assay_data_api')
+# gvk_data_view = GVKDataAPI.as_view('gvk_data_api')
+search_view = SearchAPI.as_view('search_api')
+data_view = DataAPI.as_view('data_api')
 
 # add Rules for API Endpoints
 auth_blueprint.add_url_rule(
@@ -637,14 +762,24 @@ auth_blueprint.add_url_rule(
     view_func=logout_view,
     methods=['POST']
 )
+# auth_blueprint.add_url_rule(
+#     '/assaydata',
+#     view_func=assay_data_view,
+#     methods=['GET'],
+# )
+# auth_blueprint.add_url_rule(
+#     '/gvk_data',
+#     view_func=gvk_data_view,
+#     methods=['GET'],
+# )
 auth_blueprint.add_url_rule(
-    '/assaydata',
-    view_func=assay_data_view,
+    '/search',
+    view_func=search_view,
     methods=['GET'],
 )
 auth_blueprint.add_url_rule(
-    '/gvk_data',
-    view_func=gvk_data_view,
+    '/data',
+    view_func=data_view,
     methods=['GET'],
 )
 # --- assay lists (LDH) ---

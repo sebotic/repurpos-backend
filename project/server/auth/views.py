@@ -145,11 +145,11 @@ def get_assay_list():
 
     for idx, assay in assay_descrip.sort_values(['indication', 'assay_type', 'title']).iterrows():
         temp = {
-        'assay_id': assay.assay_id,
-        'title': assay.title,
-        'indication': assay.indication,
-        'assay_type': assay.assay_type,
-        'summary':  assay.summary
+        'assay_id': assay['assay_id'],
+        'title': assay['title'],
+        'indication': assay['indication'],
+        'assay_type': assay['assay_type'],
+        'summary':  assay['summary']
         }
 
         assays.append(temp)

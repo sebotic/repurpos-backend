@@ -22,12 +22,12 @@ from data.example_data import example_data
 
 auth_blueprint = Blueprint('auth', __name__)
 
+data_dir = os.getenv('DATA_DIR')
 
 assay_descrip = pd.read_csv(data_dir + '20180222_assay_descriptions.csv')
 
 plot_data = pd.read_csv(data_dir + '20180222_EC50_DATA_RFM_IDs_cpy.csv')
 
-# data_dir = os.getenv('DATA_DIR')
 #
 # assay_data = pd.read_csv(data_dir + 'reframe_short_20170822.csv')
 # gvk_dt = pd.read_csv(data_dir + 'gvk_data_to_release.csv')
@@ -124,9 +124,11 @@ print('wd ikey map length:', len(wd_ikey_map))
 #
 #     return ad
 
+
 # --- LDH ---
 def get_assay_details(assay_id):
-    organisms = ['C. parvum', 'C. hominis', 'M. tuberculosis', 'Wolbachia', 'P. falciparum', 'Cryptosporidium', 'in vitro', 'in vivo', 'Mycobacterium tuberculosis', 'M. smegmatis']
+    organisms = ['C. parvum', 'C. hominis', 'M. tuberculosis', 'Wolbachia', 'P. falciparum',
+                 'Cryptosporidium', 'in vitro', 'in vivo', 'Mycobacterium tuberculosis', 'M. smegmatis']
     # def
     filtered = assay_descrip[assay_descrip.assay_id == assay_id].reset_index()
 
@@ -157,9 +159,9 @@ def get_assay_list():
 
 def get_dotplot_data(aid):
     def find_type(datamode):
-        if(datamode.lower() == 'decreasing'):
+        if datamode.lower() == 'decreasing':
             return 'IC'
-        elif(datamode.lower() == 'increasing'):
+        elif datamode.lower() == 'increasing':
             return 'EC'
         else:
             return 'unknown'
@@ -171,8 +173,8 @@ def get_dotplot_data(aid):
             return row.pubchem_label
 
     def find_cmpdlink(wikidata_id, url_stub = "/#/compound_data/"):
-          # URL stub for individual compound page, e.g. https://repurpos.us/#/compound_data/Q10859697
-        if(wikidata_id):
+        # URL stub for individual compound page, e.g. https://repurpos.us/#/compound_data/Q10859697
+        if wikidata_id:
             return url_stub + wikidata_id
 
 
@@ -634,6 +636,7 @@ class AssayListAPI(MethodView):
 
         return make_response(jsonify(responseObject)), 200
 
+
 # TODO: need a check if data returns something?
 class AssayDetailsAPI(MethodView):
     """
@@ -649,6 +652,7 @@ class AssayDetailsAPI(MethodView):
 
         responseObject = get_assay_details(aid)
         return make_response(responseObject.to_json(orient="records")), 200
+
 
 class PlotDataAPI(MethodView):
     """

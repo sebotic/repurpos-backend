@@ -98,10 +98,13 @@ basic_block = {
 }
 
 data_dir = os.getenv('DATA_DIR')
-assay_data = pd.read_csv(data_dir + 'reframe_short_20170822.csv')
-gvk_dt = pd.read_csv(data_dir + 'gvk_data_to_release.csv')
-integrity_dt = pd.read_csv(data_dir + 'integrity_annot_20171220.csv')
-informa_dt = pd.read_csv(data_dir + 'informa_annot_20171220.csv')
+assay_data = pd.read_csv(os.path.join(data_dir, 'reframe_short_20170822.csv'))
+gvk_dt = pd.read_csv(os.path.join(data_dir, 'gvk_data_to_release.csv'))
+integrity_dt = pd.read_csv(os.path.join(data_dir, 'integrity_annot_20171220.csv'))
+informa_dt = pd.read_csv(os.path.join(data_dir, 'informa_annot_20171220.csv'))
+
+assay_descr = pd.read_csv(os.path.join(data_dir, '20180222_assay_descriptions.csv'), header=0)
+plot_dt = pd.read_csv(os.path.join(data_dir, '20180222_EC50_DATA_RFM_IDs_cpy.csv'), header=0)
 
 for c, x in gvk_dt.iterrows():
     ikey = x['ikey']
@@ -281,3 +284,4 @@ for c, x in enumerate(qids):
 
 with open('example_data.json', 'w') as outfile:
     json.dump(example_data, outfile)
+

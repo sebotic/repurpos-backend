@@ -16,14 +16,18 @@ class User(db.Model):
     password = db.Column(db.String(255), nullable=False)
     registered_on = db.Column(db.DateTime, nullable=False)
     admin = db.Column(db.Boolean, nullable=False, default=False)
+    confirmed = db.Column(db.Boolean, nullable=False, default=False)
+    confirmed_on = db.Column(db.DateTime, nullable=True)
 
-    def __init__(self, email, password, admin=False):
+    def __init__(self, email, password, confirmed, admin=False, confirmed_on=None):
         self.email = email
         self.password = bcrypt.generate_password_hash(
             password, app.config.get('BCRYPT_LOG_ROUNDS')
         ).decode()
         self.registered_on = datetime.datetime.now()
         self.admin = admin
+        self.confirmed = confirmed
+        self.confirmed_on = confirmed_on
 
     def encode_auth_token(self, user_id):
         """

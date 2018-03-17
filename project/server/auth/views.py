@@ -1,18 +1,21 @@
 # project/server/auth/views.py
 
 
-from flask import Blueprint, request, make_response, jsonify, session
+from flask import Blueprint, request, make_response, jsonify, session, url_for, render_template
 from flask.views import MethodView
 
 import json as json
 
-from project.server import bcrypt, db
+from project.server import app, bcrypt, db
 from project.server.models import User, BlacklistToken
+from project.server.token import generate_confirmation_token, confirm_token
+from project.server.email import send_email
 
 import pandas as pd
 import wikidataintegrator as wdi
 import requests
 import os
+import datetime
 
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError
@@ -256,23 +259,32 @@ class RegisterAPI(MethodView):
             try:
                 user = User(
                     email=post_data.get('email'),
-                    password=post_data.get('password')
+                    password=post_data.get('password'),
+                    confirmed=False
                 )
                 # insert the user
                 db.session.add(user)
                 db.session.commit()
+
+                # generate email confirmation token
+                token = generate_confirmation_token(user.email)
+                confirm_url = app.config.get('FRONTEND_URL') + 'confirm/' + token # url_for('auth.confirm_email', token=token, _external=True)
+                html = render_template('activate.html', confirm_url=confirm_url)
+                subject = "ReframeDB: Please confirm your email"
+                send_email(user.email, subject, html)
+
                 # generate the auth token
                 auth_token = user.encode_auth_token(user.id)
                 responseObject = {
                     'status': 'success',
-                    'message': 'Successfully registered.',
+                    'message': 'A confirmation message has been sent to your email.',
                     'auth_token': auth_token.decode()
                 }
                 return make_response(jsonify(responseObject)), 201
             except Exception as e:
                 responseObject = {
                     'status': 'fail',
-                    'message': 'Some error occurred. Please try again.'
+                    'message': 'Some error occurred. Please try again. ' + str(e)
                 }
                 return make_response(jsonify(responseObject)), 401
         else:
@@ -303,7 +315,8 @@ class LoginAPI(MethodView):
                     responseObject = {
                         'status': 'success',
                         'message': 'Successfully logged in.',
-                        'auth_token': auth_token.decode()
+                        'auth_token': auth_token.decode(),
+                        'confirmed': user.confirmed
                     }
                     return make_response(jsonify(responseObject)), 200
             else:
@@ -409,6 +422,37 @@ class LogoutAPI(MethodView):
                 'message': 'Provide a valid auth token.'
             }
             return make_response(jsonify(responseObject)), 403
+
+class confirmEmail(MethodView):
+    """
+    Confirm Email Resource
+    """
+    def confirm_email(token):
+        try:
+            email = confirm_token(token)
+        except:
+            responseObject = {
+                'status': 'fail',
+                'message': 'The confirmation link is invalid or has expired'
+            }
+            return make_response(jsonify(responseObject)), 200
+        user = User.query.filter_by(email=email).first_or_404()
+        if user.confirmed:
+            responseObject = {
+                'status': 'fail',
+                'message': 'Account already confirmed. Please login.'
+            }
+            return make_response(jsonify(responseObject)), 200
+        else:
+            user.confirmed = True
+            user.confirmed_on = datetime.datetime.now()
+            db.session.add(user)
+            db.session.commit()
+            responseObject = {
+                'status': 'success',
+                'message': 'You have confirmed your email.'
+            }
+            return make_response(jsonify(responseObject)), 200
 
 
 # class AssayDataAPI(MethodView):
@@ -740,6 +784,8 @@ assay_details_view = AssayDetailsAPI.as_view('assay_details_api')
 plot_data_view = PlotDataAPI.as_view('plot_data_api')
 # -----------
 
+
+confirm_view = confirmEmail.as_view('confirm_email')
 # assay_data_view = AssayDataAPI.as_view('assay_data_api')
 # gvk_data_view = GVKDataAPI.as_view('gvk_data_api')
 search_view = SearchAPI.as_view('search_api')
@@ -764,6 +810,11 @@ auth_blueprint.add_url_rule(
 auth_blueprint.add_url_rule(
     '/auth/logout',
     view_func=logout_view,
+    methods=['POST']
+)
+auth_blueprint.add_url_rule(
+    '/auth/confirm/<token>',
+    view_func=confirm_view,
     methods=['POST']
 )
 # auth_blueprint.add_url_rule(

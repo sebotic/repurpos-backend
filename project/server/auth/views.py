@@ -268,7 +268,7 @@ class RegisterAPI(MethodView):
 
                 # generate email confirmation token
                 token = generate_confirmation_token(user.email)
-                confirm_url = app.config.get('FRONTEND_URL') + 'confirm/' + token # url_for('auth.confirm_email', token=token, _external=True)
+                confirm_url = app.config.get('FRONTEND_URL') + '#/confirm/' + token # url_for('auth.confirm_email', token=token, _external=True)
                 html = render_template('activate.html', confirm_url=confirm_url)
                 subject = "ReframeDB: Please confirm your email"
                 send_email(user.email, subject, html)
@@ -427,9 +427,16 @@ class confirmEmail(MethodView):
     """
     Confirm Email Resource
     """
-    def confirm_email(token):
+    def post(self):
+        post_data = request.get_json()
         try:
-            email = confirm_token(token)
+            email = confirm_token(post_data.get('token'))
+            if not email:
+                responseObject = {
+                    'status': 'fail',
+                    'message': 'The confirmation link is invalid or has expired'
+                }
+                return make_response(jsonify(responseObject)), 200
         except:
             responseObject = {
                 'status': 'fail',
@@ -450,7 +457,7 @@ class confirmEmail(MethodView):
             db.session.commit()
             responseObject = {
                 'status': 'success',
-                'message': 'You have confirmed your email.'
+                'message': 'You have confirmed your email. Please login.'
             }
             return make_response(jsonify(responseObject)), 200
 
@@ -813,7 +820,7 @@ auth_blueprint.add_url_rule(
     methods=['POST']
 )
 auth_blueprint.add_url_rule(
-    '/auth/confirm/<token>',
+    '/auth/confirm',
     view_func=confirm_view,
     methods=['POST']
 )

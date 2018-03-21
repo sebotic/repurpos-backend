@@ -9,7 +9,7 @@ database_name = 'repurpos_db'
 class BaseConfig:
     """Base configuration."""
     SECRET_KEY = os.getenv('SECRET_KEY', 'my_precious')
-    SECURITY_PASSWORD_SALT = os.getenv('SECURITY_PASSWORD_SALT', 'my_precious_two')
+    SECRET_PASSWORD_SALT = os.getenv('SECRET_PASSWORD_SALT', 'my_precious_two')
     DEBUG = False
     BCRYPT_LOG_ROUNDS = 13
     SQLALCHEMY_TRACK_MODIFICATIONS = False

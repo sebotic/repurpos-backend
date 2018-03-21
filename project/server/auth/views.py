@@ -274,11 +274,11 @@ class RegisterAPI(MethodView):
                 send_email(user.email, subject, html)
 
                 # generate the auth token
-                auth_token = user.encode_auth_token(user.id)
+                #auth_token = user.encode_auth_token(user.id)
                 responseObject = {
                     'status': 'success',
                     'message': 'A confirmation message has been sent to your email.',
-                    'auth_token': auth_token.decode()
+                    #'auth_token': auth_token.decode()
                 }
                 return make_response(jsonify(responseObject)), 201
             except Exception as e:
@@ -310,15 +310,22 @@ class LoginAPI(MethodView):
             if user and bcrypt.check_password_hash(
                 user.password, post_data.get('password')
             ):
-                auth_token = user.encode_auth_token(user.id)
-                if auth_token:
+                if user.confirmed:
+                    auth_token = user.encode_auth_token(user.id)
+                    if auth_token:
+                        responseObject = {
+                            'status': 'success',
+                            'message': 'Successfully logged in.',
+                            'auth_token': auth_token.decode(),
+                            'confirmed': user.confirmed
+                        }
+                        return make_response(jsonify(responseObject)), 200
+                else:
                     responseObject = {
-                        'status': 'success',
-                        'message': 'Successfully logged in.',
-                        'auth_token': auth_token.decode(),
-                        'confirmed': user.confirmed
+                        'status': 'fail',
+                        'message': 'Please confirm your email before logging in.'
                     }
-                    return make_response(jsonify(responseObject)), 200
+                    return make_response(jsonify(responseObject)), 500
             else:
                 responseObject = {
                     'status': 'fail',
@@ -434,7 +441,7 @@ class confirmEmail(MethodView):
             if not email:
                 responseObject = {
                     'status': 'fail',
-                    'message': 'The confirmation link is invalid or has expired'
+                    'message': 'The confirmation link is invalid'
                 }
                 return make_response(jsonify(responseObject)), 200
         except:

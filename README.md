@@ -49,13 +49,13 @@ $ export DATA_DIR="directory_with_data_files"
 Set the mail username for user confirmation:
 
 ```sh
-$ export API_MAIL_USERNAME="username"
+$ export APP_MAIL_USERNAME="username"
 ```
 
 Set the mail password:
 
 ```sh
-$ export API_MAIL_PASSWORD="password"
+$ export APP_MAIL_PASSWORD="password"
 ```
 
 ### Create DB

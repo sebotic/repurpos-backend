@@ -46,6 +46,17 @@ Set the secret key for your Google ReCaptcha:
 $ export DATA_DIR="directory_with_data_files"
 ```
 
+Set the mail username for user confirmation:
+
+```sh
+$ export APP_MAIL_USERNAME="username"
+```
+
+Set the mail password:
+
+```sh
+$ export APP_MAIL_PASSWORD="password"
+```
 
 ### Create DB
 

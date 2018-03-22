@@ -443,20 +443,20 @@ class confirmEmail(MethodView):
                     'status': 'fail',
                     'message': 'The confirmation link is invalid'
                 }
-                return make_response(jsonify(responseObject)), 200
+                return make_response(jsonify(responseObject)), 500
         except:
             responseObject = {
                 'status': 'fail',
                 'message': 'The confirmation link is invalid or has expired'
             }
-            return make_response(jsonify(responseObject)), 200
+            return make_response(jsonify(responseObject)), 500
         user = User.query.filter_by(email=email).first_or_404()
         if user.confirmed:
             responseObject = {
                 'status': 'fail',
                 'message': 'Account already confirmed. Please login.'
             }
-            return make_response(jsonify(responseObject)), 200
+            return make_response(jsonify(responseObject)), 501
         else:
             user.confirmed = True
             user.confirmed_on = datetime.datetime.now()
@@ -468,6 +468,52 @@ class confirmEmail(MethodView):
             }
             return make_response(jsonify(responseObject)), 200
 
+class confirmEmailLink(MethodView):
+    """
+    Create new confirm link
+    """
+    def post(self):
+        post_data = request.get_json();
+        try:
+            user = User.query.filter_by(
+                email=post_data.get('email')
+            ).first()
+            if user: 
+                if not user.confirmed:
+                    # generate email confirmation token
+                    token = generate_confirmation_token(user.email)
+                    confirm_url = app.config.get('FRONTEND_URL') + '#/confirm/' + token # url_for('auth.confirm_email', token=token, _external=True)
+                    html = render_template('activate.html', confirm_url=confirm_url)
+                    subject = "ReframeDB: Please confirm your email"
+                    send_email(user.email, subject, html)
+
+                    # generate the auth token
+                    #auth_token = user.encode_auth_token(user.id)
+                    responseObject = {
+                        'status': 'success',
+                        'message': 'A confirmation message has been sent to your email.',
+                        #'auth_token': auth_token.decode()
+                    }
+                    return make_response(jsonify(responseObject)), 201
+                else:
+                    responseObject = {
+                        'status': 'fail',
+                        'message': 'You have already confirmed your email. Please login.'
+                    }
+                    return make_response(jsonify(responseObject)), 501
+            else:
+                responseObject = {
+                    'status': 'fail',
+                    'message': 'That user does not exist. Please register.'
+                }
+                return make_response(jsonify(responseObject)), 500
+        except Exception as e:
+            print(e)
+            responseObject = {
+                'status': 'fail',
+                'message': 'Could not find user, please register or try again'
+            }
+            return make_response(jsonify(responseObject)), 500
 
 # class AssayDataAPI(MethodView):
 #     """
@@ -800,6 +846,7 @@ plot_data_view = PlotDataAPI.as_view('plot_data_api')
 
 
 confirm_view = confirmEmail.as_view('confirm_email')
+confirm_link = confirmEmailLink.as_view('confirm_link')
 # assay_data_view = AssayDataAPI.as_view('assay_data_api')
 # gvk_data_view = GVKDataAPI.as_view('gvk_data_api')
 search_view = SearchAPI.as_view('search_api')
@@ -829,6 +876,11 @@ auth_blueprint.add_url_rule(
 auth_blueprint.add_url_rule(
     '/auth/confirm',
     view_func=confirm_view,
+    methods=['POST']
+)
+auth_blueprint.add_url_rule(
+    '/auth/confirm/link',
+    view_func=confirm_link,
     methods=['POST']
 )
 # auth_blueprint.add_url_rule(

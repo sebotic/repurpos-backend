@@ -515,6 +515,51 @@ class confirmEmailLink(MethodView):
             }
             return make_response(jsonify(responseObject)), 500
 
+class lostPasswordLink(MethodView):
+    """
+    Create new confirm link
+    """
+    def post(self):
+        post_data = request.get_json();
+        try:
+            user = User.query.filter_by(
+                email=post_data.get('email')
+            ).first()
+            if user: 
+                if not user.confirmed:
+                    responseObject = {
+                        'status': 'fail',
+                        'message': 'You have not confirmed your email. You cannot reset your password without a valid email.',
+                        #'auth_token': auth_token.decode()
+                    }
+                    return make_response(jsonify(responseObject)), 500
+                else:
+                    # generate email confirmation token
+                    token = generate_confirmation_token(user.email)
+                    reset_pass_url = app.config.get('FRONTEND_URL') + '#/forgot-pass/' + token # url_for('auth.confirm_email', token=token, _external=True)
+                    html = render_template('password.html', reset_pass_url=reset_pass_url)
+                    subject = "ReframeDB: Reset your password"
+                    send_email(user.email, subject, html)
+
+                    responseObject = {
+                        'status': 'success',
+                        'message': 'A new password link has been sent to your email.'
+                    }
+                    return make_response(jsonify(responseObject)), 200
+            else:
+                responseObject = {
+                    'status': 'fail',
+                    'message': 'That user does not exist. Please register.'
+                }
+                return make_response(jsonify(responseObject)), 500
+        except Exception as e:
+            print(e)
+            responseObject = {
+                'status': 'fail',
+                'message': 'Could not find user, please register or try again'
+            }
+            return make_response(jsonify(responseObject)), 500
+
 # class AssayDataAPI(MethodView):
 #     """
 #     Assaydata resource
@@ -847,6 +892,7 @@ plot_data_view = PlotDataAPI.as_view('plot_data_api')
 
 confirm_view = confirmEmail.as_view('confirm_email')
 confirm_link = confirmEmailLink.as_view('confirm_link')
+lost_pass_link = lostPasswordLink.as_view('lost_pass_link')
 # assay_data_view = AssayDataAPI.as_view('assay_data_api')
 # gvk_data_view = GVKDataAPI.as_view('gvk_data_api')
 search_view = SearchAPI.as_view('search_api')
@@ -881,6 +927,11 @@ auth_blueprint.add_url_rule(
 auth_blueprint.add_url_rule(
     '/auth/confirm/link',
     view_func=confirm_link,
+    methods=['POST']
+)
+auth_blueprint.add_url_rule(
+    '/auth/forgot-pass/link',
+    view_func=lost_pass_link,
     methods=['POST']
 )
 # auth_blueprint.add_url_rule(

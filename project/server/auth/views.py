@@ -307,29 +307,36 @@ class LoginAPI(MethodView):
             user = User.query.filter_by(
                 email=post_data.get('email')
             ).first()
-            if user and bcrypt.check_password_hash(
-                user.password, post_data.get('password')
-            ):
-                if user.confirmed:
-                    auth_token = user.encode_auth_token(user.id)
-                    if auth_token:
+            if user:
+                if bcrypt.check_password_hash(
+                    user.password, post_data.get('password')
+                ):
+                    if user.confirmed:
+                        auth_token = user.encode_auth_token(user.id)
+                        if auth_token:
+                            responseObject = {
+                                'status': 'success',
+                                'message': 'Successfully logged in.',
+                                'auth_token': auth_token.decode(),
+                                'confirmed': user.confirmed
+                            }
+                            return make_response(jsonify(responseObject)), 200
+                    else:
                         responseObject = {
-                            'status': 'success',
-                            'message': 'Successfully logged in.',
-                            'auth_token': auth_token.decode(),
-                            'confirmed': user.confirmed
+                            'status': 'fail',
+                            'message': 'Please confirm your email before logging in.'
                         }
-                        return make_response(jsonify(responseObject)), 200
+                        return make_response(jsonify(responseObject)), 500
                 else:
                     responseObject = {
                         'status': 'fail',
-                        'message': 'Please confirm your email before logging in.'
+                        'message': 'Incorrect password. Please try again.'
                     }
                     return make_response(jsonify(responseObject)), 500
             else:
                 responseObject = {
                     'status': 'fail',
-                    'message': 'User does not exist.'
+                    'message': 'User does not exist. Please Register.'
                 }
                 return make_response(jsonify(responseObject)), 404
         except Exception as e:

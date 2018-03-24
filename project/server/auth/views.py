@@ -515,9 +515,81 @@ class confirmEmailLink(MethodView):
             }
             return make_response(jsonify(responseObject)), 500
 
-class lostPasswordLink(MethodView):
+class resetPassword(MethodView):
     """
-    Create new confirm link
+    Reset the users password
+    """
+    def post(self):
+        post_data = request.get_json()
+        try:
+            user = user = User.query.filter_by(id=post_data.get('user_id')).first()
+            if user:
+                user.password = bcrypt.generate_password_hash(
+                    post_data.get('password'), app.config.get('BCRYPT_LOG_ROUNDS')
+                ).decode()
+                db.session.add(user)
+                db.session.commit()
+                responseObject = {
+                    'status': 'success',
+                    'message': 'You have changed your password. Please Login.'
+                }
+                return make_response(jsonify(responseObject)), 200
+            else:
+                responseObject = {
+                    'status': 'fail',
+                    'message': 'User could not be found.'
+                }
+                return make_response(jsonify(responseObject)), 501
+        except Exception as e:
+            print(e)
+            responseObject = {
+                'status': 'fail',
+                'message': 'That user could not be found. Please register.'
+            }
+            return make_response(jsonify(responseObject)), 500
+
+class resetPasswordCheck(MethodView):
+    """
+    Check if the reset link is valid
+    """
+    def post(self):
+        post_data = request.get_json()
+        try:
+            email = confirm_token(post_data.get('token'))
+            if not email:
+                responseObject = {
+                    'status': 'fail',
+                    'message': 'The reset password link is invalid'
+                }
+                return make_response(jsonify(responseObject)), 500
+        except:
+            responseObject = {
+                'status': 'fail',
+                'message': 'The reset password link is invalid or has expired'
+            }
+            return make_response(jsonify(responseObject)), 500
+        user = User.query.filter_by(email=email).first_or_404()
+        if user.confirmed:
+            responseObject = {
+                'status': 'success',
+                'message': 'Please enter your new password.',
+                'data': {
+                    'user_id': user.id,
+                    'email': user.email
+                }
+            }
+            return make_response(jsonify(responseObject)), 200
+        else:
+            # This response should never happen
+            responseObject = {
+                'status': 'fail',
+                'message': 'You have not confirmed your email. Please confirm your email or create an account.'
+            }
+            return make_response(jsonify(responseObject)), 501
+
+class resetPasswordLink(MethodView):
+    """
+    Create new reset password link
     """
     def post(self):
         post_data = request.get_json();
@@ -536,7 +608,7 @@ class lostPasswordLink(MethodView):
                 else:
                     # generate email confirmation token
                     token = generate_confirmation_token(user.email)
-                    reset_pass_url = app.config.get('FRONTEND_URL') + '#/forgot-pass/' + token # url_for('auth.confirm_email', token=token, _external=True)
+                    reset_pass_url = app.config.get('FRONTEND_URL') + '#/reset_pass/' + token # url_for('auth.confirm_email', token=token, _external=True)
                     html = render_template('password.html', reset_pass_url=reset_pass_url)
                     subject = "ReframeDB: Reset your password"
                     send_email(user.email, subject, html)
@@ -892,7 +964,9 @@ plot_data_view = PlotDataAPI.as_view('plot_data_api')
 
 confirm_view = confirmEmail.as_view('confirm_email')
 confirm_link = confirmEmailLink.as_view('confirm_link')
-lost_pass_link = lostPasswordLink.as_view('lost_pass_link')
+reset_pass_link = resetPasswordLink.as_view('reset_pass_link')
+reset_pass_check = resetPasswordCheck.as_view('reset_pass_check')
+reset_pass = resetPassword.as_view('reset_pass')
 # assay_data_view = AssayDataAPI.as_view('assay_data_api')
 # gvk_data_view = GVKDataAPI.as_view('gvk_data_api')
 search_view = SearchAPI.as_view('search_api')
@@ -930,8 +1004,18 @@ auth_blueprint.add_url_rule(
     methods=['POST']
 )
 auth_blueprint.add_url_rule(
-    '/auth/forgot-pass/link',
-    view_func=lost_pass_link,
+    '/auth/reset_pass',
+    view_func=reset_pass,
+    methods=['POST']
+)
+auth_blueprint.add_url_rule(
+    '/auth/reset_pass/check',
+    view_func=reset_pass_check,
+    methods=['POST']
+)
+auth_blueprint.add_url_rule(
+    '/auth/reset_pass/link',
+    view_func=reset_pass_link,
     methods=['POST']
 )
 # auth_blueprint.add_url_rule(

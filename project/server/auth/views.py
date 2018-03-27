@@ -189,7 +189,7 @@ def get_dotplot_data(aid):
     filtered = filtered.loc[filtered['assay_type'] != 'unknown'] # remove weird data modes
 
     filtered['url'] = filtered.wikidata.apply(find_cmpdlink)
-    filtered['name'] = filtered.apply(find_name, axis = 1)
+    filtered['name'] = filtered.apply(find_name, axis=1)
 
     # group by unique ID and nest.
     # fncns = ['count', 'min', 'max', 'mean']
@@ -201,15 +201,15 @@ def get_dotplot_data(aid):
     # convert to the proper json-able structure
     for idx, cmpd in filtered.iterrows():
         temp = {
-        'assay_title': cmpd.assay_title,
-        'calibr_id': cmpd.calibr_id,
-        'name': cmpd.pc,
-        'ac50': cmpd.ac50,
-        'assay_type': cmpd.assay_type,
-        'efficacy': cmpd.efficacy,
-        'r_sq': cmpd.rsquared,
-        'pubchem_id': cmpd['PubChem CID'],
-        'url': cmpd.url
+            'assay_title': cmpd.assay_title,
+            'calibr_id': cmpd.calibr_id,
+            'name': cmpd.pubchem_label,
+            'ac50': cmpd.ac50,
+            'assay_type': cmpd.assay_type,
+            'efficacy': cmpd.efficacy,
+            'r_sq': cmpd.rsquared,
+            'pubchem_id': cmpd['PubChem CID'],
+            'url': cmpd.url
         }
 
         assay_data.append(temp)

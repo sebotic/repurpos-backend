@@ -170,16 +170,17 @@ def get_dotplot_data(aid):
             return 'unknown'
 
     def find_name(row):
-        if(pd.isnull(row.pubchem_label)):
+        if pd.isnull(row.pubchem_label):
             return row.ID
         else:
             return row.pubchem_label
 
     def find_cmpdlink(wikidata_id, url_stub = "/#/compound_data/"):
         # URL stub for individual compound page, e.g. https://repurpos.us/#/compound_data/Q10859697
-        if wikidata_id:
+        if pd.notnull(wikidata_id):
             return url_stub + wikidata_id
-
+        else:
+            return ''
 
     assay_data = []
     # filter out data: selected assay, valid AC50 value
@@ -189,7 +190,7 @@ def get_dotplot_data(aid):
     filtered = filtered.loc[filtered['assay_type'] != 'unknown'] # remove weird data modes
 
     filtered['url'] = filtered.wikidata.apply(find_cmpdlink)
-    filtered['name'] = filtered.apply(find_name, axis=1)
+    filtered['main_label'] = filtered.apply(find_name, axis=1)
 
     # group by unique ID and nest.
     # fncns = ['count', 'min', 'max', 'mean']
@@ -203,12 +204,12 @@ def get_dotplot_data(aid):
         temp = {
             'assay_title': cmpd.assay_title,
             'calibr_id': cmpd.calibr_id,
-            'name': cmpd.pubchem_label,
+            'name': cmpd.main_label,
             'ac50': cmpd.ac50,
             'assay_type': cmpd.assay_type,
             'efficacy': cmpd.efficacy,
             'r_sq': cmpd.rsquared,
-            'pubchem_id': cmpd['PubChem CID'],
+            'pubchem_id': cmpd['PubChem CID'] if pd.notnull(cmpd['PubChem CID']) else '',
             'url': cmpd.url
         }
 
@@ -915,6 +916,7 @@ class PlotDataAPI(MethodView):
                 user = User.query.filter_by(id=resp).first()
                 if user.id:
                     responseObject = get_dotplot_data(aid)
+                    print(responseObject)
 
 # !! WARNING: jsonify can't handle NaN, since JSON hates NaN.
 
@@ -941,8 +943,8 @@ class PlotDataAPI(MethodView):
                     #     "url": "/#/compound_data/Q239569"
                     # }]
 
-
                     return make_response(jsonify(responseObject)), 200
+
             responseObject = {
                 'status': 'fail',
                 'message': resp

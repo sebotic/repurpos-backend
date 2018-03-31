@@ -26,3 +26,4 @@ wikidataintegrator
 requests
 pandas
 elasticsearch
+boto3

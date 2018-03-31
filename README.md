@@ -46,17 +46,15 @@ Set the secret key for your Google ReCaptcha:
 $ export DATA_DIR="directory_with_data_files"
 ```
 
-Set the mail username for user confirmation:
+Set the Amazon SES variables for user confirmation and password reset:
 
 ```sh
-$ export APP_MAIL_USERNAME="username"
+$ export SES_REGION_NAME="region"
+$ export SES_EMAIL_SOURCE="email"
+$ export AWS_ACCESS_KEY_ID="aws_access_key_id"
+$ export AWS_SECRET_ACCESS_KEY="aws_secret_access_key"
 ```
 
-Set the mail password:
-
-```sh
-$ export APP_MAIL_PASSWORD="password"
-```
 
 ### Create DB
 

@@ -15,17 +15,13 @@ class BaseConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Mail settings
-    MAIL_SERVER = 'smtp.googlemail.com'
-    MAIL_PORT = 465
-    MAIL_USE_TLS = False
-    MAIL_USE_SSL = True
-    MAIL_USERNAME = os.getenv('APP_MAIL_USERNAME', '')
-    MAIL_PASSWORD = os.getenv('APP_MAIL_PASSWORD', '')
+    MAIL_SERVER = os.getenv('SES_MAIL_SERVER', 'email-smtp.us-east-1.amazonaws.com' )
+    MAIL_PORT = 587
+    MAIL_USE_TLS = True
+    MAIL_USE_SSL = False
+    MAIL_USERNAME = os.getenv('SES_SMTP_USERNAME')
+    MAIL_PASSWORD = os.getenv('SES_SMTP_PASSWORD')
     MAIL_DEFAULT_SENDER = 'help@reframedb.org'
-    SES_REGION_NAME = os.getenv('SES_REGION_NAME', 'us-east-1')
-    SES_EMAIL_SOURCE = os.getenv('SES_EMAIL_SOURCE', 'help@reframedb.org')
-    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
-    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '')
 
 
 class DevelopmentConfig(BaseConfig):

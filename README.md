@@ -49,10 +49,9 @@ $ export DATA_DIR="directory_with_data_files"
 Set the Amazon SES variables for user confirmation and password reset:
 
 ```sh
-$ export SES_REGION_NAME="region"
-$ export SES_EMAIL_SOURCE="email"
-$ export AWS_ACCESS_KEY_ID="aws_access_key_id"
-$ export AWS_SECRET_ACCESS_KEY="aws_secret_access_key"
+$ export SES_MAIL_SERVER="region"
+$ export SES_SMTP_USERNAME="username"
+$ export SES_SMTP_PASSWORD="password"
 ```
 
 

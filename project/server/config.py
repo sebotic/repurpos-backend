@@ -2,7 +2,7 @@
 
 import os
 basedir = os.path.abspath(os.path.dirname(__file__))
-postgres_local_base = 'postgresql://postgres:@localhost/'
+postgres_local_base = 'postgresql://{}:@localhost/'.format(os.getenv('POSTGRES_USER', 'postgres'))
 database_name = 'repurpos_db'
 
 
@@ -15,6 +15,7 @@ class BaseConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Mail settings
+
     MAIL_SERVER = os.getenv('SES_MAIL_SERVER', 'email-smtp.us-east-1.amazonaws.com' )
     MAIL_PORT = 587
     MAIL_USE_TLS = True
@@ -22,6 +23,7 @@ class BaseConfig:
     MAIL_USERNAME = os.getenv('SES_SMTP_USERNAME')
     MAIL_PASSWORD = os.getenv('SES_SMTP_PASSWORD')
     MAIL_DEFAULT_SENDER = 'help@reframedb.org'
+
 
 
 class DevelopmentConfig(BaseConfig):

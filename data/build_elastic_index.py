@@ -45,37 +45,46 @@ integrity_doc_map = {
 }
 
 informa_doc_map = {
-    'Drug Name': 'drug_name',
+    'Drug Name': ('drug_name', '\n'),
     'Global Status': ('phase', '; '),
     'Highest Phase Reached-Ceased Statuses': 'highest_phase',
-    'Mechanism Of Action': ('mechanism', '; '),
-    'Target Name': None,
-    'Target Families': None,
-    'Origin': None,
-    'Chemical Name': None,
+    'Mechanism Of Action': ('mechanism', '\n'),
+    'Target Name': ('target_name', '\n'),
+    'Target Families': ('target_families', '\n'),
+    'Origin': 'origin',
+    'Chemical Name': 'chemical_name',
     'Chemical structure (SMILES format)': 'smiles',
     'Drug Key (Unique ID)': None,
     'ikey': 'ikey',
     'PubChem CID': 'PubChem CID',
     'wikidata': 'wikidata',
+    'informa_id': 'informa_id'
 }
 
 assay_data_doc_map = {
-    'substring': None,
-    'calibr_id': 'id',
+    'calibr_id': 'reframe_id',
     'ac50': 'ac50',
     'datamode': 'datamode',
-    'genedata_id': None,
+    'genedata_id': 'assay_id',
     'assay_title': 'assay_title',
-    'smiles': 'smiles',
-    'inchi_key': 'ikey',
+    # 'smiles': 'smiles',
+    'ikey': 'ikey',
     'PubChem CID': 'PubChem CID',
-    'PubChem lable': None,
-    'wikidata': 'wikidata'
+    'pubchem_label': 'pubchem_label',
+    'wikidata': 'wikidata',
+    'library': 'chem_vendor',
+    'source_id': 'chem_vendor_id'
+
 }
 
 reframe_doc = {
     'ikey': '',
+
+    'reframe_id': '',
+
+    'qid': '',
+
+    'alt_id': '',
 
     'gvk': {
 
@@ -98,18 +107,22 @@ basic_block = {
 }
 
 data_dir = os.getenv('DATA_DIR')
-assay_data = pd.read_csv(os.path.join(data_dir, 'reframe_short_20170822.csv'))
-gvk_dt = pd.read_csv(os.path.join(data_dir, 'gvk_data_to_release.csv'))
-integrity_dt = pd.read_csv(os.path.join(data_dir, 'integrity_annot_20171220.csv'))
-informa_dt = pd.read_csv(os.path.join(data_dir, 'informa_annot_20171220.csv'))
+# assay_data = pd.read_csv(os.path.join(data_dir, 'reframe_short_20170822.csv'))
+gvk_dt = pd.read_csv(os.path.join(data_dir, 'gvk_w_reframe_id.csv'))
+integrity_dt = pd.read_csv(os.path.join(data_dir, 'integrity_w_reframe_id.csv'))
+informa_dt = pd.read_csv(os.path.join(data_dir, 'informa_w_reframe_id.csv'))
 
 assay_descr = pd.read_csv(os.path.join(data_dir, '20180222_assay_descriptions.csv'), header=0)
-plot_dt = pd.read_csv(os.path.join(data_dir, '20180222_EC50_DATA_RFM_IDs_cpy.csv'), header=0)
+assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_w_vendor_mapping.csv'), header=0)
+# vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot.csv'), sep='|')
 
 for c, x in gvk_dt.iterrows():
     ikey = x['ikey']
     if pd.isnull(ikey):
-        continue
+        if pd.notnull(x['gvk_id']):
+            ikey = str(x['gvk_id'])
+        else:
+            continue
 
     tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
@@ -141,7 +154,10 @@ for c, x in gvk_dt.iterrows():
 for c, x in integrity_dt.iterrows():
     ikey = x['ikey']
     if pd.isnull(ikey):
-        continue
+        if pd.notnull(x['id']):
+            ikey = str(x['id'])
+        else:
+            continue
 
     tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
@@ -173,7 +189,10 @@ for c, x in integrity_dt.iterrows():
 for c, x in informa_dt.iterrows():
     ikey = x['ikey']
     if pd.isnull(ikey):
-        continue
+        if pd.notnull(x['informa_id']):
+            ikey = str(x['informa_id'])
+        else:
+            continue
 
     tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
@@ -201,7 +220,7 @@ for c, x in informa_dt.iterrows():
     if c % 100 == 0:
         print(c)
 
-for i in assay_data['inchi_key'].unique():
+for i in assay_data['ikey'].unique():
     tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = i
     ikey = i
@@ -210,7 +229,7 @@ for i in assay_data['inchi_key'].unique():
     if pd.isnull(ikey):
         continue
 
-    for c, x in assay_data.loc[assay_data['inchi_key'] == i, :].iterrows():
+    for c, x in assay_data.loc[assay_data['ikey'] == i, :].iterrows():
 
         tt = {}
 

@@ -21,7 +21,7 @@ gvk_doc_map = {
     'hvac_id': 'hvac_id',
     'gvk_id': 'gvk_id',
     'calibr_note': None,
-    'drug_name': 'drug_name',
+    'drug_name': ('drug_name', '; '),
     'phase': ('phase', '; '),
     'drug_roa': ('roa', '; '),
     'category': ('category', '; '),
@@ -34,7 +34,7 @@ gvk_doc_map = {
 integrity_doc_map = {
     'id': 'id',
     'smiles': 'smiles',
-    'name': 'drug_name',
+    'name': ('drug_name', '; '),
     'status': ('phase', '; '),
     'int_thera_group': ('category', '; '),
     'int_MoA': ('mechanism', '; '),

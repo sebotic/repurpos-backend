@@ -18,9 +18,9 @@ es = Elasticsearch()
 # index name 'reframe'
 
 gvk_doc_map = {
-    'hvac_id': 'hvac_id',
+    # 'hvac_id': 'hvac_id',
     'gvk_id': 'gvk_id',
-    'calibr_note': None,
+    # 'calibr_note': None,
     'drug_name': ('drug_name', '; '),
     'phase': ('phase', '; '),
     'drug_roa': ('roa', '; '),
@@ -38,25 +38,25 @@ integrity_doc_map = {
     'status': ('phase', '; '),
     'int_thera_group': ('category', '; '),
     'int_MoA': ('mechanism', '; '),
-    'calibr_note': None,
+    # 'calibr_note': None,
     'ikey': 'ikey',
     'wikidata': 'wikidata',
     'PubChem CID': 'PubChem CID'
 }
 
 informa_doc_map = {
-    'Drug Name': ('drug_name', '\n'),
-    'Global Status': ('phase', '; '),
-    'Highest Phase Reached-Ceased Statuses': 'highest_phase',
-    'Mechanism Of Action': ('mechanism', '\n'),
-    'Target Name': ('target_name', '\n'),
-    'Target Families': ('target_families', '\n'),
-    'Origin': 'origin',
-    'Chemical Name': 'chemical_name',
-    'Chemical structure (SMILES format)': 'smiles',
-    'Drug Key (Unique ID)': None,
+    'name': ('drug_name', '\n'),
+    # 'Global Status': ('phase', '; '),
+    'highest_status (between global and Highest Status)': 'highest_phase',
+    'moa': ('mechanism', '\n'),
+    'target_name': ('target_name', '\n'),
+    'target_family': ('target_families', '\n'),
+    'origin': 'origin',
+    'chem_name': 'chemical_name',
+    'smiles': 'smiles',
+    'key': None,
     'ikey': 'ikey',
-    'PubChem CID': 'PubChem CID',
+    'pubchem': 'PubChem CID',
     'wikidata': 'wikidata',
     'informa_id': 'informa_id'
 }
@@ -108,15 +108,18 @@ basic_block = {
 
 data_dir = os.getenv('DATA_DIR')
 # assay_data = pd.read_csv(os.path.join(data_dir, 'reframe_short_20170822.csv'))
-gvk_dt = pd.read_csv(os.path.join(data_dir, 'gvk_w_reframe_id.csv'))
-integrity_dt = pd.read_csv(os.path.join(data_dir, 'integrity_w_reframe_id.csv'))
-informa_dt = pd.read_csv(os.path.join(data_dir, 'informa_w_reframe_id.csv'))
+gvk_dt = pd.read_csv(os.path.join(data_dir, '20180430_GVK_excluded_column.csv'))
+integrity_dt = pd.read_csv(os.path.join(data_dir, 'integrity_annot_20180504.csv'))
+informa_dt = pd.read_csv(os.path.join(data_dir, '20180430_Informa_excluded_column.csv'))
 
 assay_descr = pd.read_csv(os.path.join(data_dir, '20180222_assay_descriptions.csv'), header=0)
 assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_w_vendor_mapping.csv'), header=0)
 # vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot.csv'), sep='|')
 
 for c, x in gvk_dt.iterrows():
+    if x['exclude'] == 1:
+        continue
+
     ikey = x['ikey']
     if pd.isnull(ikey):
         if pd.notnull(x['gvk_id']):
@@ -152,6 +155,9 @@ for c, x in gvk_dt.iterrows():
         print(c)
 
 for c, x in integrity_dt.iterrows():
+    if x['exclude'] == 1:
+        continue
+
     ikey = x['ikey']
     if pd.isnull(ikey):
         if pd.notnull(x['id']):
@@ -187,6 +193,9 @@ for c, x in integrity_dt.iterrows():
 
 
 for c, x in informa_dt.iterrows():
+    if x['exclude'] == 1:
+        continue
+
     ikey = x['ikey']
     if pd.isnull(ikey):
         if pd.notnull(x['informa_id']):

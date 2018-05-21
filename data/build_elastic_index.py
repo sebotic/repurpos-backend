@@ -5,6 +5,8 @@ import copy
 import json
 import os
 
+import wikidataintegrator as wdi
+
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError
 es = Elasticsearch()
@@ -116,6 +118,8 @@ assay_descr = pd.read_csv(os.path.join(data_dir, '20180222_assay_descriptions.cs
 assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_w_vendor_mapping.csv'), header=0)
 # vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot.csv'), sep='|')
 
+ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
+
 for c, x in gvk_dt.iterrows():
     if x['exclude'] == 1:
         continue
@@ -129,6 +133,9 @@ for c, x in gvk_dt.iterrows():
 
     tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
+
+    if ikey in ikey_wd_map:
+        tmp_obj['qid'] = ikey_wd_map[ikey]
 
     for k, v in gvk_doc_map.items():
         if pd.isnull(x[k]) or v is None:
@@ -168,6 +175,9 @@ for c, x in integrity_dt.iterrows():
     tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
 
+    if ikey in ikey_wd_map:
+        tmp_obj['qid'] = ikey_wd_map[ikey]
+
     for k, v in integrity_doc_map.items():
         if pd.isnull(x[k]) or v is None:
             continue
@@ -206,6 +216,9 @@ for c, x in informa_dt.iterrows():
     tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
 
+    if ikey in ikey_wd_map:
+        tmp_obj['qid'] = ikey_wd_map[ikey]
+
     for k, v in informa_doc_map.items():
         if pd.isnull(x[k]) or v is None:
             continue
@@ -234,6 +247,9 @@ for i in assay_data['ikey'].unique():
     tmp_obj['ikey'] = i
     ikey = i
     print(i)
+
+    if ikey in ikey_wd_map:
+        tmp_obj['qid'] = ikey_wd_map[ikey]
 
     if pd.isnull(ikey):
         continue

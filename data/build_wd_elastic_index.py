@@ -33,7 +33,12 @@ bd = {
 }
 
 c = client.IndicesClient(es)
-c.put_settings(index='wikidata', body=bd)
+# check if index exists, otherwise, create
+if c.exists(index='wikidata'):
+
+    c.put_settings(index='wikidata', body=bd)
+else:
+    es.create(index='wikidata', doc_type='compound', body=bd)
 
 
 for count, hit in enumerate(r['hits']['hits']):

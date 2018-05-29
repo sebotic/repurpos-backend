@@ -49,7 +49,7 @@ for count, hit in enumerate(r['hits']['hits']):
     }
 
     r = requests.get('http://www.wikidata.org/entity/{}'.format(qid), headers=header).json()
-    print(r)
+    # print(r)
 
     obj = r['entities'][qid]
 

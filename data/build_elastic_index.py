@@ -6,16 +6,45 @@ import json
 import os
 
 import wikidataintegrator as wdi
+from cdk_pywrapper.cdk_pywrapper import Compound
 
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError
 es = Elasticsearch()
 
 
-
 # test_inchi = 'InChI=1S/C23H18ClF2N3O3S/c1-2-9-33(31,32)29-19-8-7-18(25)20(21(19)26)22(30)17-12-28-23-16(17)10-14(11-27-23)13-3-5-15(24)6-4-13/h3-8,10-12,29H,2,9H2,1H3,(H,27,28)'
 # cmpnd = Compound(compound_string=test_inchi, identifier_type='inchi')
 # print(cmpnd.get_inchi_key())
+
+def generate_fingerprint(smiles):
+    if smiles:
+        compound = Compound(compound_string=smiles, identifier_type='smiles')
+        fingerprint = compound.get_bitmap_fingerprint()
+        fp = {x for x in str(fingerprint)[1:-1].split(', ')}
+        return list(fp)
+    else:
+        return []
+
+
+def update_es(data):
+    tmp_data = copy.deepcopy(data)
+    if es.exists(index='reframe', doc_type='compound', id=ikey):
+        for k, v in data.items():
+            if (type(v) == list or type(v) == dict) and len(v) == 0:
+                del tmp_data[k]
+            elif not v:
+                del tmp_data[k]
+
+        es.update(index='reframe', id=ikey, doc_type='compound', body={'doc': tmp_data})
+    else:
+        try:
+            # if index does not yet exist, make sure that all fields are being added
+            res = es.index(index="reframe", doc_type='compound', id=ikey, body=data)
+
+        except RequestError as e:
+            print(tmp_obj)
+
 
 # index name 'reframe'
 
@@ -88,6 +117,8 @@ reframe_doc = {
 
     'alt_id': '',
 
+    'fingerprint': [],
+
     'gvk': {
 
     },
@@ -146,14 +177,10 @@ for c, x in gvk_dt.iterrows():
         else:
             tmp_obj['gvk'].update({v: x[k]})
 
-    # print(tmp_obj)
+    if 'smiles' in tmp_obj['gvk']:
+        tmp_obj['fingerprint'] = generate_fingerprint(tmp_obj['gvk']['smiles'])
 
-    try:
-        res = es.index(index="reframe", doc_type='compound', id=ikey, body=tmp_obj)
-
-    except RequestError as e:
-        print(tmp_obj)
-        break
+    update_es(tmp_obj)
 
     # if c > 20:
     #     break
@@ -187,16 +214,10 @@ for c, x in integrity_dt.iterrows():
         else:
             tmp_obj['integrity'].update({v: x[k]})
 
-    if es.exists(index='reframe', doc_type='compound', id=ikey):
-        # print('this exists!!')
-        es.update(index='reframe', id=ikey, doc_type='compound', body={'doc': {'integrity': tmp_obj['integrity']}})
-    else:
-        try:
-            res = es.index(index="reframe", doc_type='compound', id=ikey, body=tmp_obj)
+    if 'smiles' in tmp_obj['integrity']:
+        tmp_obj['fingerprint'] = generate_fingerprint(tmp_obj['integrity']['smiles'])
 
-        except RequestError as e:
-            print(tmp_obj)
-            break
+    update_es(tmp_obj)
 
     if c % 100 == 0:
         print(c)
@@ -228,16 +249,10 @@ for c, x in informa_dt.iterrows():
         else:
             tmp_obj['informa'].update({v: x[k]})
 
-    if es.exists(index='reframe', doc_type='compound', id=ikey):
-        # print('this exists!!')
-        es.update(index='reframe', id=ikey, doc_type='compound', body={'doc': {'informa': tmp_obj['informa']}})
-    else:
-        try:
-            res = es.index(index="reframe", doc_type='compound', id=ikey, body=tmp_obj)
+    if 'smiles' in tmp_obj['informa']:
+        tmp_obj['fingerprint'] = generate_fingerprint(tmp_obj['informa']['smiles'])
 
-        except RequestError as e:
-            print(tmp_obj)
-            break
+    update_es(tmp_obj)
 
     if c % 100 == 0:
         print(c)
@@ -279,21 +294,7 @@ for i in assay_data['ikey'].unique():
 
         tmp_obj['assay'].append(tt)
 
-    # print(tmp_obj['assay'])
-
-    if es.exists(index='reframe', doc_type='compound', id=ikey):
-        # print('this exists!!')
-        es.update(index='reframe', id=ikey, doc_type='compound', body={'doc': {'assay': tmp_obj['assay']}})
-    else:
-        try:
-            res = es.index(index="reframe", doc_type='compound', id=ikey, body=tmp_obj)
-
-        except RequestError as e:
-            print(tmp_obj)
-            break
-
-    # if c % 100 == 0:
-    #     print(c)
+    update_es(tmp_obj)
 
 body = {
     "query": {

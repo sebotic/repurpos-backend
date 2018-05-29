@@ -27,7 +27,7 @@ r = es.search(index="reframe", body=body)
 bd = {
     'mapping': {
         'total_fields': {
-            'limit': 10000
+            'limit': 30000
         }
     }
 }
@@ -50,7 +50,8 @@ for count, hit in enumerate(r['hits']['hits']):
 
     if es.exists(index='wikidata', doc_type='compound', id=qid):
         # print('this exists!!')
-        es.update(index='wikidata', id=qid, doc_type='compound', body={'doc': obj})
+        # es.update(index='wikidata', id=qid, doc_type='compound', body={'doc': obj})
+        pass
     else:
         try:
             res = es.index(index="wikidata", doc_type='compound', id=qid, body=obj)

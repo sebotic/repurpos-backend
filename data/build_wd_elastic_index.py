@@ -38,7 +38,7 @@ if c.exists(index='wikidata'):
 
     c.put_settings(index='wikidata', body=bd)
 else:
-    es.create(index='wikidata', doc_type='compound', body=bd)
+    c.create(index='wikidata', body=bd)
 
 
 for count, hit in enumerate(r['hits']['hits']):

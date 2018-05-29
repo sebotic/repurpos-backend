@@ -29,6 +29,7 @@ def generate_fingerprint(smiles):
 
 def update_es(data):
     tmp_data = copy.deepcopy(data)
+    ikey = tmp_data['ikey']
     if es.exists(index='reframe', doc_type='compound', id=ikey):
         for k, v in data.items():
             if (type(v) == list or type(v) == dict) and len(v) == 0:

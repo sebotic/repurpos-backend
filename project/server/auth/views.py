@@ -4,7 +4,8 @@
 from flask import Blueprint, request, make_response, jsonify, session, url_for, render_template
 from flask.views import MethodView
 
-import json as json
+from data.example_data import example_data
+from cdk_pywrapper.cdk_pywrapper import Compound
 
 from project.server import app, bcrypt, db
 from project.server.models import User, BlacklistToken
@@ -21,7 +22,6 @@ from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError
 es = Elasticsearch()
 
-from data.example_data import example_data
 
 auth_blueprint = Blueprint('auth', __name__)
 
@@ -39,10 +39,65 @@ plot_data = pd.read_csv(os.path.join(data_dir, '20180222_EC50_DATA_RFM_IDs_cpy.c
 # informa_dt = pd.read_csv(data_dir + 'informa_annot_20171220.csv')
 #
 
+# construct a map of InChI keys to Wikidata IDs
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 wd_ikey_map = dict(zip(ikey_wd_map.values(), ikey_wd_map.keys()))
 
 print('wd ikey map length:', len(wd_ikey_map))
+
+
+# retrieve chemical fingerprints and store them in a list, also store the associated IDs in a list
+fingerprint_list = list()
+id_list = list()
+
+
+def calculate_tanimoto(fp_1, fp_2):
+    intersct = fp_1.intersection(fp_2)
+    return len(intersct)/(len(fp_1) + len(fp_2) - len(intersct))
+
+
+def process_batch(batch):
+    for count, hit in enumerate(batch['hits']['hits']):
+        compound_id = hit['_id']
+        id_list.append(compound_id)
+        fingerprint = set(hit['_source']['fingerprint'])
+        fingerprint_list.append(fingerprint)
+
+
+body = {
+    "_source": {
+        "includes": ["fingerprint"],
+    },
+    "query": {
+        "query_string": {
+
+            "query": "*",
+            "fields": ['fingerprint']
+        }
+    },
+    "sort": [
+        "_doc"
+    ]
+}
+
+es.indices.refresh(index="reframe")
+
+r = es.search(index="reframe", body=body, scroll='1m')
+scroll_id = r['_scroll_id']
+process_batch(r)
+
+counter = 0
+while True:
+    r = es.scroll(scroll_id=scroll_id, scroll='1m')
+    counter += 1
+    #     print('batch processed:', counter)
+    if len(r['hits']['hits']) == 0:
+        break
+
+    process_batch(r)
+
+print('Total count of compound fingerprints:', len(fingerprint_list))
+
 #
 #
 # def get_assay_data(qid):
@@ -744,40 +799,139 @@ class SearchAPI(MethodView):
     def __init__(self):
         pass
 
+    def retrieve_document(self, compound_id):
+        search_result = {
+            'id': '',  # InChI key or other
+            'qid': '',  # if available
+            'main_label': '',  # WHO INN or other
+            'assay_types': [],  # list of available assay types
+            'tanimoto': 0,
+            'reframeid': '',
+            'pubchem': '',
+            'properties': [
+                {'name': 'screening collection', 'tooltip': 'physical compound available in screening collection',
+                 'value': False},
+                {'name': 'assay hits', 'value': False},
+                {'name': 'Wikidata', 'value': False},
+                {'name': 'GVK', 'value': False},
+                {'name': 'Integrity', 'value': False},
+                {'name': 'Citeline', 'value': False},
+            ]
+        }
+
+        r = es.get(index='reframe', doc_type='compound', id=compound_id)
+
+        search_result['id'] = r['_id']
+        if 'qid' in r:
+            search_result['qid'] = r['qid']
+
+        data = r['_source']
+
+        for vendor in ['gvk', 'informa', 'integrity']:
+            if len(data[vendor]) == 0:
+                continue
+
+            search_result['main_label'] = data[vendor]['drug_name'][0]
+
+            if 'PubChem CID' in data[vendor]:
+                search_result['pubchem'] = data[vendor]['PubChem CID']
+
+
+
+
+
+
+        return search_result
+
     def get(self):
         # get the auth token
         auth_header = request.headers.get('Authorization')
 
         print(auth_header)
         args = request.args
-        search_term = args['search']
+        # TODO: add input checks here
+        search_term = args['query']
+        search_type = args['type']
 
-        body = {
-            "from": 0, "size": 100,
-            "query": {
-                "query_string": {
+        search_mode = ''
+        if 'mode' in args:
+            search_mode = args['mode']
 
-                    "query": "{}*".format(search_term)
+        if 'tanimoto' in args and search_type == 'structure' and search_mode == 'similarity':
+            tanimoto = float(args['tanimoto'])
+
+            try:
+                cmpnd = Compound(compound_string=search_term, identifier_type='smiles')
+            except ValueError as e:
+                try:
+                    cmpnd = Compound(compound_string=search_term, identifier_type='inchi')
+                except ValueError as e:
+                    return make_response(jsonify({
+                        'status': 'fail',
+                        'message': 'Tanimoto similarity cannot be calculated, no valid SMILES or InChI provided'
+                    })), 500
+
+            searched_cmpnd_fp = {x for x in str(cmpnd.get_bitmap_fingerprint())[1:-1].split(', ')}
+
+            found_cmpnds = []
+            for c, x in enumerate(fingerprint_list):
+                tnmt = calculate_tanimoto(searched_cmpnd_fp, x)
+                if tnmt > tanimoto:
+                    search_result = self.retrieve_document(id_list[c])
+                    search_result['tanimoto'] = tnmt
+                    found_cmpnds.append(search_result)
+
+            return make_response(jsonify({'status': 'success', 'results': found_cmpnds})), 200
+
+        if search_type == 'string':
+            body = {
+                "from": 0, "size": 100,
+                "query": {
+                    "query_string": {
+
+                        "query": "{}*".format(search_term)
+                    }
                 }
             }
-        }
 
-        try:
+            try:
+                res = es.search(index=['reframe', 'wikidata'], body=body)
+            except Exception as e:
+                return make_response(jsonify({'status': 'fail', 'ikeys': []})), 500
 
-            res = es.search(index="reframe", body=body)
-        except Exception as e:
-            return make_response(jsonify({'status': 'fail', 'ikeys': []})), 500
+            results = []
+            for x in res['hits']['hits']:
+                tmp_dict = {
+                    'id': '',
+                    'qid': ''
+                }
 
-        ikeys = []
-        for x in res['hits']['hits']:
-            ikeys.append(x['_id'])
 
-        responseObject = {
-            'status': 'success',
-            'ikeys': ikeys
-        }
 
-        return make_response(jsonify(responseObject)), 200
+                if x['_index'] == 'reframe':
+                    # tmp_dict.update({'id': x['_id']})
+                    #
+                    # if 'qid' in x['_source']:
+                    #     tmp_dict.update({'qid': x['_source']['qid']})
+
+                    results.append(self.retrieve_document(compound_id=x['_id']))
+
+                if x['_index'] == 'wikidata':
+                    # tmp_dict.update({'qid': x['_id']})
+
+                    ikey = x['_source']['claims']['P235'][0]['mainsnak']['datavalue']['value']
+                    # tmp_dict.update({'id': ikey, 'source': 'wikidata'})
+                    # tmp_dict.update({'id': ikey})
+
+                    results.append(self.retrieve_document(compound_id=ikey))
+
+
+            responseObject = {
+                'status': 'success',
+                'results': results
+            }
+
+            return make_response(jsonify(responseObject)), 200
 
 
 

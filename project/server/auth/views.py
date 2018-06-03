@@ -822,26 +822,82 @@ class SearchAPI(MethodView):
         r = es.get(index='reframe', doc_type='compound', id=compound_id)
 
         search_result['id'] = r['_id']
-        if 'qid' in r:
-            search_result['qid'] = r['qid']
-
         data = r['_source']
 
-        for vendor in ['gvk', 'informa', 'integrity']:
+        if 'qid' in data:
+            qid = data['qid']
+            search_result['qid'] = qid
+            if qid:
+                search_result['properties'][2]['value'] = True
+
+        for vendor, i in [('gvk', 3), ('informa', 5), ('integrity', 4)]:
             if len(data[vendor]) == 0:
                 continue
+
+            search_result['properties'][i]['value'] = True
 
             search_result['main_label'] = data[vendor]['drug_name'][0]
 
             if 'PubChem CID' in data[vendor]:
                 search_result['pubchem'] = data[vendor]['PubChem CID']
 
+        unique_assays = set()
+        for assay in data['assay']:
+            unique_assays.add(assay['assay_title'])
+            search_result['properties'][1]['value'] = True
+            if 'reframe_id' in assay:
+                search_result['reframeid'] = assay['reframe_id']
+                search_result['properties'][0]['value'] = True
 
-
-
-
+        search_result['assay_types'] = list(unique_assays)
 
         return search_result
+
+    def get_ikey(self, chem_id):
+        try:
+            return Compound(compound_string=chem_id, identifier_type='smiles')
+        except ValueError as e:
+            try:
+                return Compound(compound_string=chem_id, identifier_type='inchi')
+            except ValueError as e:
+                raise e
+
+    def exec_freetext_search(self, search_term):
+        body = {
+            "from": 0, "size": 100,
+            "query": {
+                "query_string": {
+
+                    "query": "{}*".format(search_term)
+                }
+            }
+        }
+
+        try:
+            res = es.search(index=['reframe', 'wikidata'], body=body)
+        except Exception as e:
+            raise e
+
+        results = []
+        for x in res['hits']['hits']:
+            compound_id = ''
+
+            if x['_index'] == 'reframe':
+                compound_id = x['_id']
+            elif x['_index'] == 'wikidata':
+                # get InChI key
+                compound_id = x['_source']['claims']['P235'][0]['mainsnak']['datavalue']['value']
+
+            if len(results) == 0:
+                results.append(self.retrieve_document(compound_id=compound_id))
+            else:
+                for y in results:
+                    if y['id'] == compound_id:
+                        continue
+                    else:
+                        results.append(self.retrieve_document(compound_id=compound_id))
+
+        return results
 
     def get(self):
         # get the auth token
@@ -861,15 +917,12 @@ class SearchAPI(MethodView):
             tanimoto = float(args['tanimoto'])
 
             try:
-                cmpnd = Compound(compound_string=search_term, identifier_type='smiles')
+                cmpnd = self.get_ikey(search_term)
             except ValueError as e:
-                try:
-                    cmpnd = Compound(compound_string=search_term, identifier_type='inchi')
-                except ValueError as e:
-                    return make_response(jsonify({
-                        'status': 'fail',
-                        'message': 'Tanimoto similarity cannot be calculated, no valid SMILES or InChI provided'
-                    })), 500
+                return make_response(jsonify({
+                    'status': 'fail',
+                    'message': 'Tanimoto similarity cannot be calculated, no valid SMILES or InChI provided'
+                })), 500
 
             searched_cmpnd_fp = {x for x in str(cmpnd.get_bitmap_fingerprint())[1:-1].split(', ')}
 
@@ -884,47 +937,10 @@ class SearchAPI(MethodView):
             return make_response(jsonify({'status': 'success', 'results': found_cmpnds})), 200
 
         if search_type == 'string':
-            body = {
-                "from": 0, "size": 100,
-                "query": {
-                    "query_string": {
-
-                        "query": "{}*".format(search_term)
-                    }
-                }
-            }
-
             try:
-                res = es.search(index=['reframe', 'wikidata'], body=body)
+                results = self.exec_freetext_search(search_term)
             except Exception as e:
-                return make_response(jsonify({'status': 'fail', 'ikeys': []})), 500
-
-            results = []
-            for x in res['hits']['hits']:
-                tmp_dict = {
-                    'id': '',
-                    'qid': ''
-                }
-
-
-
-                if x['_index'] == 'reframe':
-                    # tmp_dict.update({'id': x['_id']})
-                    #
-                    # if 'qid' in x['_source']:
-                    #     tmp_dict.update({'qid': x['_source']['qid']})
-
-                    results.append(self.retrieve_document(compound_id=x['_id']))
-
-                if x['_index'] == 'wikidata':
-                    # tmp_dict.update({'qid': x['_id']})
-
-                    ikey = x['_source']['claims']['P235'][0]['mainsnak']['datavalue']['value']
-                    # tmp_dict.update({'id': ikey, 'source': 'wikidata'})
-                    # tmp_dict.update({'id': ikey})
-
-                    results.append(self.retrieve_document(compound_id=ikey))
-
+                return make_response(jsonify({'status': 'fail', 'results': []})), 500
 
             responseObject = {
                 'status': 'success',
@@ -933,6 +949,37 @@ class SearchAPI(MethodView):
 
             return make_response(jsonify(responseObject)), 200
 
+        if search_type == 'structure' and (search_mode == 'exact' or search_mode == 'stereofree'):
+
+            try:
+                cmpnd = self.get_ikey(search_term)
+                ikey = cmpnd.get_inchi_key()
+            except ValueError as e:
+                return make_response(jsonify({
+                    'status': 'fail',
+                    'message': 'Similarity cannot be calculated, no valid SMILES or InChI provided'
+                })), 500
+
+            try:
+                # cut off stere information from InChI key
+                if search_mode == 'stereofree':
+                    ikey = ikey[:15]
+
+                results = self.exec_freetext_search(ikey)
+            except Exception as e:
+                return make_response(jsonify({'status': 'fail', 'results': []})), 500
+
+            responseObject = {
+                'status': 'success',
+                'results': results
+            }
+
+            return make_response(jsonify(responseObject)), 200
+
+        return make_response(jsonify({
+            'status': 'fail',
+            'message': 'Malformed query'
+        })), 500
 
 
 
@@ -984,7 +1031,8 @@ class DataAPI(MethodView):
         print(auth_header)
         args = request.args
         qid = args['qid']
-        ikey = wd_ikey_map[qid]
+        # ikey = wd_ikey_map[qid]
+        ikey = qid
         print(qid, ikey)
 
         try:

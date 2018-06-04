@@ -888,14 +888,13 @@ class SearchAPI(MethodView):
                 # get InChI key
                 compound_id = x['_source']['claims']['P235'][0]['mainsnak']['datavalue']['value']
 
-            if len(results) == 0:
+            found = False
+            for y in results:
+                if y['id'] == compound_id:
+                    found = True
+
+            if not found:
                 results.append(self.retrieve_document(compound_id=compound_id))
-            else:
-                for y in results:
-                    if y['id'] == compound_id:
-                        continue
-                    else:
-                        results.append(self.retrieve_document(compound_id=compound_id))
 
         return results
 

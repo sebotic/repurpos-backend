@@ -40,6 +40,7 @@ if c.exists(index='wikidata'):
 else:
     c.create(index='wikidata', body=bd)
 
+session = requests.Session()
 
 for count, hit in enumerate(r['hits']['hits']):
     qid = hit['_source']['qid']
@@ -48,15 +49,22 @@ for count, hit in enumerate(r['hits']['hits']):
         'Accept': 'application/json'
     }
 
-    r = requests.get('http://www.wikidata.org/entity/{}'.format(qid), headers=header).json()
+    r = session.get('http://www.wikidata.org/entity/{}'.format(qid), headers=header).json()
     # print(r)
 
     obj = r['entities'][qid]
+    del obj['descriptions']
+
+    for claim, value in obj['claims'].items():
+        # print(claim, value)
+        for x in value:
+            if 'references' in x:
+                del x['references']
 
     if es.exists(index='wikidata', doc_type='compound', id=qid):
         # print('this exists!!')
-        # es.update(index='wikidata', id=qid, doc_type='compound', body={'doc': obj})
-        pass
+        es.update(index='wikidata', id=qid, doc_type='compound', body={'doc': obj})
+        # pass
     else:
         try:
             res = es.index(index="wikidata", doc_type='compound', id=qid, body=obj)

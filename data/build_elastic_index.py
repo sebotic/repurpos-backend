@@ -47,6 +47,24 @@ def update_es(data):
             print(tmp_obj)
 
 
+def desalt_compound(smiles):
+    desalted_smiles = []
+    desalted_ikeys = []
+    if smiles:
+        for single_compound in smiles.split('.'):
+            desalted_smiles.append(single_compound)
+            try:
+                compound = Compound(compound_string=single_compound, identifier_type='smiles')
+                ikey = compound.get_inchi_key()
+                desalted_ikeys.append(ikey)
+            except Exception as e:
+                desalted_ikeys.append('')
+
+    return desalted_smiles, desalted_ikeys
+
+
+
+
 # index name 'reframe'
 
 gvk_doc_map = {
@@ -179,7 +197,12 @@ for c, x in gvk_dt.iterrows():
             tmp_obj['gvk'].update({v: x[k]})
 
     if 'smiles' in tmp_obj['gvk']:
-        tmp_obj['fingerprint'] = generate_fingerprint(tmp_obj['gvk']['smiles'])
+        smiles = tmp_obj['gvk']['smiles']
+        tmp_obj['fingerprint'] = generate_fingerprint(smiles)
+        d_smiles, d_ikey = desalt_compound(smiles)
+        if len(d_smiles) > 1:
+            tmp_obj['sub_smiles'] = d_smiles
+            tmp_obj['sub_ikey'] = d_ikey
 
     update_es(tmp_obj)
 
@@ -216,7 +239,12 @@ for c, x in integrity_dt.iterrows():
             tmp_obj['integrity'].update({v: x[k]})
 
     if 'smiles' in tmp_obj['integrity']:
-        tmp_obj['fingerprint'] = generate_fingerprint(tmp_obj['integrity']['smiles'])
+        smiles = tmp_obj['integrity']['smiles']
+        tmp_obj['fingerprint'] = generate_fingerprint(smiles)
+        d_smiles, d_ikey = desalt_compound(smiles)
+        if len(d_smiles) > 1:
+            tmp_obj['sub_smiles'] = d_smiles
+            tmp_obj['sub_ikey'] = d_ikey
 
     update_es(tmp_obj)
 
@@ -251,7 +279,12 @@ for c, x in informa_dt.iterrows():
             tmp_obj['informa'].update({v: x[k]})
 
     if 'smiles' in tmp_obj['informa']:
-        tmp_obj['fingerprint'] = generate_fingerprint(tmp_obj['informa']['smiles'])
+        smiles = tmp_obj['informa']['smiles']
+        tmp_obj['fingerprint'] = generate_fingerprint(smiles)
+        d_smiles, d_ikey = desalt_compound(smiles)
+        if len(d_smiles) > 1:
+            tmp_obj['sub_smiles'] = d_smiles
+            tmp_obj['sub_ikey'] = d_ikey
 
     update_es(tmp_obj)
 

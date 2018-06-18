@@ -230,10 +230,10 @@ def get_dotplot_data(aid):
         else:
             return row.pubchem_label
 
-    def find_cmpdlink(wikidata_id, url_stub = "/#/compound_data/"):
+    def find_cmpdlink(compound_id, url_stub = "/#/compound_data/"):
         # URL stub for individual compound page, e.g. https://repurpos.us/#/compound_data/Q10859697
-        if pd.notnull(wikidata_id):
-            return url_stub + wikidata_id
+        if pd.notnull(compound_id):
+            return url_stub + compound_id
         else:
             return ''
 
@@ -244,7 +244,7 @@ def get_dotplot_data(aid):
     filtered['assay_type'] = filtered.datamode.apply(find_type)
     filtered = filtered.loc[filtered['assay_type'] != 'unknown'] # remove weird data modes
 
-    filtered['url'] = filtered.wikidata.apply(find_cmpdlink)
+    filtered['url'] = filtered.ikey.apply(find_cmpdlink) + ';qid=' + filtered.wikidata
     filtered['main_label'] = filtered.apply(find_name, axis=1)
 
     # group by unique ID and nest.

@@ -237,8 +237,9 @@ def get_dotplot_data(aid):
     filtered['assay_type'] = filtered.datamode.apply(find_type)
     filtered = filtered.loc[filtered['assay_type'] != 'unknown'] # remove weird data modes
 
-    filtered['url'] = filtered[['ikey', 'wikidata']].apply(lambda x: '/#/compound_data/{}'
-                                                           .format(x['ikey']) if pd.isnull(x['wikidata']) else '/#/compound_data/{};qid={}'.format(x['ikey'], x['wikidata']), axis=1)
+    filtered['url'] = filtered[['ikey', 'wikidata']].apply(
+        lambda x: '/#/compound_data/{}'.format(x['ikey'])
+        if pd.isnull(x['wikidata']) else '/#/compound_data/{};qid={}'.format(x['ikey'], x['wikidata']), axis=1)
 
     filtered['main_label'] = filtered.apply(find_name, axis=1)
 
@@ -1009,6 +1010,35 @@ class SearchAPI(MethodView):
             return make_response(jsonify(responseObject)), 401
 
 
+class MolfileAPI(MethodView):
+    def __init__(self):
+        pass
+
+    def get(self):
+        args = request.args
+        compound_structure = args['compound_structure']
+
+        try:
+            compound = Compound(compound_string=compound_structure, identifier_type='smiles')
+        except ValueError as e:
+            try:
+                compound = Compound(compound_string=compound_structure, identifier_type='inchi')
+            except ValueError as e:
+                response = {
+                    'status': 'fail',
+                    'message': 'Invalid SMILES or InChI'
+                }
+                return make_response(jsonify(response)), 401
+
+        molfile = compound.get_molfile()
+
+        response = {
+            'status': 'success',
+            'molfile': molfile
+        }
+
+        return make_response(jsonify(response)), 200
+
 
 class DataAPI(MethodView):
     """
@@ -1177,6 +1207,8 @@ reset_pass = resetPassword.as_view('reset_pass')
 search_view = SearchAPI.as_view('search_api')
 data_view = DataAPI.as_view('data_api')
 
+molfile_view = MolfileAPI.as_view('molfile_conversion')
+
 # add Rules for API Endpoints
 auth_blueprint.add_url_rule(
     '/auth/register',
@@ -1257,5 +1289,12 @@ auth_blueprint.add_url_rule(
 auth_blueprint.add_url_rule(
     '/assaydata_plot',
     view_func=plot_data_view,
+    methods=['GET'],
+)
+
+# chem API
+auth_blueprint.add_url_rule(
+    '/molfile',
+    view_func=molfile_view,
     methods=['GET'],
 )

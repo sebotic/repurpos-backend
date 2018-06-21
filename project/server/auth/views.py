@@ -20,7 +20,7 @@ import datetime
 
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError
-es = Elasticsearch()
+es = Elasticsearch(timeout=30, max_retries=10, retry_on_timeout=True)
 
 
 auth_blueprint = Blueprint('auth', __name__)
@@ -870,7 +870,7 @@ class SearchAPI(MethodView):
         }
 
         try:
-            res = es.search(index=['reframe', 'wikidata'], body=body)
+            res = es.search(index=['reframe', ], body=body)
         except Exception as e:
             raise e
 
@@ -932,6 +932,18 @@ class SearchAPI(MethodView):
             return make_response(jsonify({'status': 'success', 'results': found_cmpnds})), 200
 
         if search_type == 'string':
+
+            analyze_body = {
+                "analyzer": "standard",
+                "text": search_term
+            }
+
+            analyze_result = es.indices.analyze(index='reframe', body=analyze_body)
+
+            if len(analyze_result['tokens']) > 15:
+                print('too complex search')
+                return make_response(jsonify({'status': 'fail, too complex search query', 'results': []})), 400
+
             try:
                 results = self.exec_freetext_search(search_term)
             except Exception as e:

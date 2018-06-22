@@ -885,7 +885,7 @@ class SearchAPI(MethodView):
         }
 
         try:
-            res = es.search(index=['reframe', ], body=body)
+            res = es.search(index=['reframe', 'wikidata'], body=body)
         except Exception as e:
             raise e
 

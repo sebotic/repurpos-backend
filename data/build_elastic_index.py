@@ -63,6 +63,14 @@ def desalt_compound(smiles):
     return desalted_smiles, desalted_ikeys
 
 
+def get_rfm_ids(ikey):
+    rfm_ids = []
+
+    for k, v in rfm_ikey_map.items():
+        if v == ikey:
+            rfm_ids.append(k)
+
+    return rfm_ids
 
 
 # index name 'reframe'
@@ -130,7 +138,7 @@ assay_data_doc_map = {
 reframe_doc = {
     'ikey': '',
 
-    'reframe_id': '',
+    'reframe_id': [],
 
     'qid': '',
 
@@ -166,9 +174,11 @@ informa_dt = pd.read_csv(os.path.join(data_dir, '20180430_Informa_excluded_colum
 
 assay_descr = pd.read_csv(os.path.join(data_dir, '20180222_assay_descriptions.csv'), header=0)
 assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_w_vendor_mapping.csv'), header=0)
-# vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot.csv'), sep='|')
+vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot.csv'), sep=',')
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
+
+rfm_ikey_map = {x['public_id']: x['ikey'] for x in vendor_dt[['public_id', 'ikey']].to_dict(orient='records')}
 
 for c, x in gvk_dt.iterrows():
     if x['exclude'] == 1:
@@ -183,6 +193,7 @@ for c, x in gvk_dt.iterrows():
 
     tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
+    tmp_obj['reframe_id'] = get_rfm_ids(ikey)
 
     if ikey in ikey_wd_map:
         tmp_obj['qid'] = ikey_wd_map[ikey]
@@ -225,6 +236,7 @@ for c, x in integrity_dt.iterrows():
 
     tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
+    tmp_obj['reframe_id'] = get_rfm_ids(ikey)
 
     if ikey in ikey_wd_map:
         tmp_obj['qid'] = ikey_wd_map[ikey]
@@ -265,6 +277,7 @@ for c, x in informa_dt.iterrows():
 
     tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
+    tmp_obj['reframe_id'] = get_rfm_ids(ikey)
 
     if ikey in ikey_wd_map:
         tmp_obj['qid'] = ikey_wd_map[ikey]
@@ -299,6 +312,7 @@ for i in assay_data['ikey'].unique():
 
     if ikey in ikey_wd_map:
         tmp_obj['qid'] = ikey_wd_map[ikey]
+        tmp_obj['reframe_id'] = get_rfm_ids(ikey)
 
     if pd.isnull(ikey):
         continue

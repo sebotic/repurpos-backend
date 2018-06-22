@@ -20,7 +20,7 @@ import datetime
 
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError
-es = Elasticsearch(timeout=30, max_retries=10, retry_on_timeout=True)
+es = Elasticsearch()
 
 
 auth_blueprint = Blueprint('auth', __name__)
@@ -802,7 +802,7 @@ class SearchAPI(MethodView):
             'main_label': '',  # WHO INN or other
             'assay_types': [],  # list of available assay types
             'tanimoto': 0,
-            'reframeid': '',
+            'reframeid': [],
             'pubchem': '',
             'properties': [
                 {'name': 'screening collection', 'tooltip': 'physical compound available in screening collection',
@@ -826,6 +826,9 @@ class SearchAPI(MethodView):
             if qid:
                 search_result['properties'][2]['value'] = True
 
+        if 'reframe_id' in data:
+            search_result['reframeid'] = data['reframe_id']
+
         for vendor, i in [('gvk', 3), ('informa', 5), ('integrity', 4)]:
             if len(data[vendor]) == 0:
                 continue
@@ -839,11 +842,8 @@ class SearchAPI(MethodView):
 
         unique_assays = set()
         for assay in data['assay']:
-            unique_assays.add(assay['assay_title'])
+            unique_assays.add((assay['assay_title'], assay['assay_id']))
             search_result['properties'][1]['value'] = True
-            if 'reframe_id' in assay:
-                search_result['reframeid'] = assay['reframe_id']
-                search_result['properties'][0]['value'] = True
 
         search_result['assay_types'] = list(unique_assays)
 

@@ -800,6 +800,7 @@ class SearchAPI(MethodView):
             'id': '',  # InChI key or other
             'qid': '',  # if available
             'main_label': '',  # WHO INN or other
+            'aliases': [],
             'assay_types': [],  # list of available assay types
             'tanimoto': 0,
             'reframeid': [],
@@ -829,6 +830,7 @@ class SearchAPI(MethodView):
         if 'reframe_id' in data:
             search_result['reframeid'] = data['reframe_id']
 
+        aliases = set()
         for vendor, i in [('gvk', 3), ('informa', 5), ('integrity', 4)]:
             if len(data[vendor]) == 0:
                 continue
@@ -836,9 +838,22 @@ class SearchAPI(MethodView):
             search_result['properties'][i]['value'] = True
 
             search_result['main_label'] = data[vendor]['drug_name'][0]
+            aliases.update(data[vendor]['drug_name'][1:])
+
+            if 'synonyms' in data[vendor]:
+                aliases.update(data[vendor]['synonyms'])
 
             if 'PubChem CID' in data[vendor]:
                 search_result['pubchem'] = data[vendor]['PubChem CID']
+
+        if not search_result['main_label'] and len(aliases) > 0:
+            search_result['main_label'] = aliases.pop()
+
+        if search_result['main_label'] in aliases:
+            aliases.discard(search_result['main_label'])
+
+        search_result['aliases'] = list(aliases)
+
 
         unique_assays = set()
         for assay in data['assay']:

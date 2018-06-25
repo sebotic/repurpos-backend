@@ -795,7 +795,7 @@ class SearchAPI(MethodView):
     def __init__(self):
         pass
 
-    def retrieve_document(self, compound_id):
+    def retrieve_document(self, compound_id, qid=''):
         search_result = {
             'id': '',  # InChI key or other
             'qid': '',  # if available
@@ -815,6 +815,26 @@ class SearchAPI(MethodView):
                 {'name': 'Citeline', 'value': False},
             ]
         }
+
+        wd_main_label = ''
+        who_inn = ''
+
+        if qid:
+            wd_r = es.get(index='wikidata', doc_type='compound', id=qid)
+            wd_data = wd_r['_source']
+            if 'en' in wd_data['labels']:
+                wd_main_label = wd_data['labels']['en']['value']
+
+            try:
+                if 'P2275' in wd_data['claims']:
+                    who_inn = wd_data['claims']['P2275'][0]['mainsnak']['datavalue']['value']['text']
+            except KeyError:
+                pass
+
+            if who_inn:
+                search_result['main_label'] = who_inn
+            elif wd_main_label:
+                search_result['main_label'] = wd_main_label
 
         r = es.get(index='reframe', doc_type='compound', id=compound_id)
 
@@ -837,8 +857,13 @@ class SearchAPI(MethodView):
 
             search_result['properties'][i]['value'] = True
 
-            search_result['main_label'] = data[vendor]['drug_name'][0]
-            aliases.update(data[vendor]['drug_name'][1:])
+            if not who_inn or not wd_main_label:
+                search_result['main_label'] = data[vendor]['drug_name'][0]
+                aliases.update(data[vendor]['drug_name'][1:])
+            else:
+                aliases.update(data[vendor]['drug_name'])
+                aliases.discard(who_inn)
+                aliases.discard(wd_main_label)
 
             if 'synonyms' in data[vendor]:
                 aliases.update(data[vendor]['synonyms'])
@@ -849,11 +874,12 @@ class SearchAPI(MethodView):
         if not search_result['main_label'] and len(aliases) > 0:
             search_result['main_label'] = aliases.pop()
 
-        if search_result['main_label'] in aliases:
-            aliases.discard(search_result['main_label'])
+        aliases.discard(search_result['main_label'])
+        aliases.discard(search_result['main_label'].upper())
+        aliases.discard(search_result['main_label'].lower())
+        aliases.discard(search_result['main_label'].title())
 
         search_result['aliases'] = list(aliases)
-
 
         unique_assays = set()
         for assay in data['assay']:
@@ -892,12 +918,19 @@ class SearchAPI(MethodView):
         results = []
         for x in res['hits']['hits']:
             compound_id = ''
+            qid = ''
 
             if x['_index'] == 'reframe':
                 compound_id = x['_id']
             elif x['_index'] == 'wikidata':
+                qid = x['_id']
                 # get InChI key
                 compound_id = x['_source']['claims']['P235'][0]['mainsnak']['datavalue']['value']
+
+                # make sure that Wikidata item gets used (labels, etc)
+                for c, y in enumerate(results):
+                    if y['id'] == compound_id:
+                        results[c] = self.retrieve_document(compound_id=compound_id, qid=qid)
 
             found = False
             for y in results:
@@ -905,7 +938,7 @@ class SearchAPI(MethodView):
                     found = True
 
             if not found:
-                results.append(self.retrieve_document(compound_id=compound_id))
+                results.append(self.retrieve_document(compound_id=compound_id, qid=qid))
 
         return results
 

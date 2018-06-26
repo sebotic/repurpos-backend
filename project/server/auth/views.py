@@ -873,6 +873,9 @@ class SearchAPI(MethodView):
 
         if not search_result['main_label'] and len(aliases) > 0:
             search_result['main_label'] = aliases.pop()
+        elif not search_result['main_label']:
+            # as a last resort, set the ID as label
+            search_result['main_label'] = r['_id']
 
         aliases.discard(search_result['main_label'])
         aliases.discard(search_result['main_label'].upper())

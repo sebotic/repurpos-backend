@@ -40,10 +40,10 @@ plot_data = pd.read_csv(os.path.join(data_dir, '20180222_EC50_DATA_RFM_IDs_cpy.c
 #
 
 # construct a map of InChI keys to Wikidata IDs
-ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
-wd_ikey_map = dict(zip(ikey_wd_map.values(), ikey_wd_map.keys()))
-
-print('wd ikey map length:', len(wd_ikey_map))
+# ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
+# wd_ikey_map = dict(zip(ikey_wd_map.values(), ikey_wd_map.keys()))
+#
+# print('wd ikey map length:', len(wd_ikey_map))
 
 
 # retrieve chemical fingerprints and store them in a list, also store the associated IDs in a list
@@ -886,19 +886,19 @@ class SearchAPI(MethodView):
 
         unique_assays = set()
         for assay in data['assay']:
-            unique_assays.add((assay['assay_title'], assay['assay_id']))
+            unique_assays.add((assay['assay_title'], assay['assay_id'] if 'assay_id' in assay else ''))
             search_result['properties'][1]['value'] = True
 
         search_result['assay_types'] = list(unique_assays)
 
         return search_result
 
-    def get_ikey(self, chem_id):
+    def get_compound_container(self, chem_id, suppress_hydrogens=True):
         try:
-            return Compound(compound_string=chem_id, identifier_type='smiles')
+            return Compound(compound_string=chem_id, identifier_type='smiles', suppress_hydrogens=suppress_hydrogens)
         except ValueError as e:
             try:
-                return Compound(compound_string=chem_id, identifier_type='inchi')
+                return Compound(compound_string=chem_id, identifier_type='inchi', suppress_hydrogens=suppress_hydrogens)
             except ValueError as e:
                 raise e
 
@@ -907,6 +907,7 @@ class SearchAPI(MethodView):
             "from": 0, "size": 100,
             "query": {
                 "query_string": {
+                    "default_operator": "AND",
 
                     "query": "{}*".format(search_term)
                 }
@@ -963,7 +964,7 @@ class SearchAPI(MethodView):
             tanimoto = float(args['tanimoto'])
 
             try:
-                cmpnd = self.get_ikey(search_term)
+                cmpnd = self.get_compound_container(search_term, suppress_hydrogens=True)
             except ValueError as e:
                 return make_response(jsonify({
                     'status': 'fail',
@@ -1010,7 +1011,7 @@ class SearchAPI(MethodView):
         if search_type == 'structure' and (search_mode == 'exact' or search_mode == 'stereofree'):
 
             try:
-                cmpnd = self.get_ikey(search_term)
+                cmpnd = self.get_compound_container(search_term)
                 ikey = cmpnd.get_inchi_key()
             except ValueError as e:
                 return make_response(jsonify({

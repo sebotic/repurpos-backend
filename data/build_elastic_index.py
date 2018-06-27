@@ -19,7 +19,7 @@ es = Elasticsearch()
 
 def generate_fingerprint(smiles):
     if smiles:
-        compound = Compound(compound_string=smiles, identifier_type='smiles')
+        compound = Compound(compound_string=smiles, identifier_type='smiles', suppress_hydrogens=True)
         fingerprint = compound.get_bitmap_fingerprint()
         fp = {x for x in str(fingerprint)[1:-1].split(', ')}
         return list(fp)

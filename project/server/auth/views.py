@@ -537,7 +537,7 @@ class confirmEmailLink(MethodView):
             user = User.query.filter_by(
                 email=post_data.get('email')
             ).first()
-            if user: 
+            if user:
                 if not user.confirmed:
                     # generate email confirmation token
                     token = generate_confirmation_token(user.email)
@@ -656,7 +656,7 @@ class resetPasswordLink(MethodView):
             user = User.query.filter_by(
                 email=post_data.get('email')
             ).first()
-            if user: 
+            if user:
                 if not user.confirmed:
                     responseObject = {
                         'status': 'fail',
@@ -808,11 +808,11 @@ class SearchAPI(MethodView):
             'properties': [
                 {'name': 'screening collection', 'tooltip': 'physical compound available in screening collection',
                  'value': False},
-                {'name': 'assay hits', 'value': False},
-                {'name': 'Wikidata', 'value': False},
-                {'name': 'GVK', 'value': False},
-                {'name': 'Integrity', 'value': False},
-                {'name': 'Citeline', 'value': False},
+                {'name': 'assay hits', 'tooltip': 'compound responded in 1+ assays', 'value': False},
+                {'name': 'Wikidata', 'tooltip': 'annotation data available from Wikidata', 'value': False},
+                {'name': 'GVK', 'tooltip': 'annotation data available from GVK-Excelra GOSTAR', 'value': False},
+                {'name': 'Integrity', 'tooltip': 'annotation data available from Clarivate Integrity', 'value': False},
+                {'name': 'Citeline', 'tooltip': 'annotation data available from Citeline Pharmaprojects', 'value': False},
             ]
         }
 

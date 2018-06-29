@@ -1094,7 +1094,7 @@ class MolfileAPI(MethodView):
                     'status': 'fail',
                     'message': 'Invalid SMILES or InChI'
                 }
-                return make_response(jsonify(response)), 401
+                return make_response(jsonify(response)), 400
 
         molfile = compound.get_molfile()
 
@@ -1127,7 +1127,7 @@ class CompoundSVGAPI(MethodView):
                     'status': 'fail',
                     'message': 'Invalid SMILES or InChI'
                 }
-                return make_response(jsonify(response)), 401
+                return make_response(jsonify(response)), 400
 
         svg_xml = compound.get_svg()
 

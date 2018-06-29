@@ -1084,17 +1084,17 @@ class MolfileAPI(MethodView):
 
         try:
             compound = Compound(compound_string=compound_structure, identifier_type='smiles')
-        except ValueError as e:
+        except Exception as e:
             try:
                 compound = Compound(compound_string=compound_structure, identifier_type='inchi')
-            except ValueError as e:
+                compound.get_inchi_key()
+            except Exception as e:
+                print(e)
                 response = {
                     'status': 'fail',
                     'message': 'Invalid SMILES or InChI'
                 }
-                return make_response(jsonify({
-                    'status': 'fail',
-                    'message': 'Invalid structure, could not convert into Molfile format.'})), 401
+                return make_response(jsonify(response)), 401
 
         molfile = compound.get_molfile()
 
@@ -1116,17 +1116,18 @@ class CompoundSVGAPI(MethodView):
 
         try:
             compound = Compound(compound_string=compound_structure, identifier_type='smiles')
-        except ValueError as e:
+        except Exception as e:
             try:
+                print('executed inchi conv')
                 compound = Compound(compound_string=compound_structure, identifier_type='inchi')
-            except ValueError as e:
+                compound.get_inchi_key()
+            except Exception as e:
+                print(e)
                 response = {
                     'status': 'fail',
                     'message': 'Invalid SMILES or InChI'
                 }
-                return make_response(jsonify({
-                    'status': 'fail',
-                    'message': 'Invalid structure, could not convert into SVG format.'})), 401
+                return make_response(jsonify(response)), 401
 
         svg_xml = compound.get_svg()
 

@@ -1104,6 +1104,36 @@ class MolfileAPI(MethodView):
         return make_response(jsonify(response)), 200
 
 
+class CompoundSVGAPI(MethodView):
+    def __init__(self):
+        pass
+
+    def get(self):
+        args = request.args
+        compound_structure = args['structure']
+
+        try:
+            compound = Compound(compound_string=compound_structure, identifier_type='smiles')
+        except ValueError as e:
+            try:
+                compound = Compound(compound_string=compound_structure, identifier_type='inchi')
+            except ValueError as e:
+                response = {
+                    'status': 'fail',
+                    'message': 'Invalid SMILES or InChI'
+                }
+                return make_response(jsonify(response)), 401
+
+        svg_xml = compound.get_svg()
+
+        response = {
+            'status': 'success',
+            'compound_svg': svg_xml
+        }
+
+        return make_response(jsonify(response)), 200
+
+
 class DataAPI(MethodView):
     """
     Data resource
@@ -1272,6 +1302,7 @@ search_view = SearchAPI.as_view('search_api')
 data_view = DataAPI.as_view('data_api')
 
 molfile_view = MolfileAPI.as_view('molfile_conversion')
+compound_svg_view = CompoundSVGAPI.as_view('compound_svg')
 
 # add Rules for API Endpoints
 auth_blueprint.add_url_rule(
@@ -1362,3 +1393,11 @@ auth_blueprint.add_url_rule(
     view_func=molfile_view,
     methods=['GET'],
 )
+
+auth_blueprint.add_url_rule(
+    '/compound_svg',
+    view_func=compound_svg_view,
+    methods=['GET'],
+)
+
+

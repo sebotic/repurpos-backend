@@ -1092,7 +1092,9 @@ class MolfileAPI(MethodView):
                     'status': 'fail',
                     'message': 'Invalid SMILES or InChI'
                 }
-                return make_response(jsonify(response)), 401
+                return make_response(jsonify({
+                    'status': 'fail',
+                    'message': 'Invalid structure, could not convert into Molfile format.'})), 401
 
         molfile = compound.get_molfile()
 
@@ -1122,7 +1124,9 @@ class CompoundSVGAPI(MethodView):
                     'status': 'fail',
                     'message': 'Invalid SMILES or InChI'
                 }
-                return make_response(jsonify(response)), 401
+                return make_response(jsonify({
+                    'status': 'fail',
+                    'message': 'Invalid structure, could not convert into SVG format.'})), 401
 
         svg_xml = compound.get_svg()
 

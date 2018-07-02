@@ -795,7 +795,8 @@ class SearchAPI(MethodView):
     def __init__(self):
         pass
 
-    def retrieve_document(self, compound_id, qid=''):
+    @staticmethod
+    def retrieve_document(compound_id, qid=''):
         search_result = {
             'id': '',  # InChI key or other
             'qid': '',  # if available
@@ -804,6 +805,7 @@ class SearchAPI(MethodView):
             'assay_types': [],  # list of available assay types
             'tanimoto': 0,
             'reframeid': [],
+            'smiles': '',
             'pubchem': '',
             'properties': [
                 {'name': 'screening collection', 'tooltip': 'physical compound available in screening collection',
@@ -871,6 +873,9 @@ class SearchAPI(MethodView):
             if 'PubChem CID' in data[vendor]:
                 search_result['pubchem'] = data[vendor]['PubChem CID']
 
+            if 'smiles' in data[vendor] and not search_result['smiles']:
+                search_result['smiles'] = data[vendor]['smiles']
+
         if not search_result['main_label'] and len(aliases) > 0:
             search_result['main_label'] = aliases.pop()
         elif not search_result['main_label']:
@@ -902,7 +907,8 @@ class SearchAPI(MethodView):
             except ValueError as e:
                 raise e
 
-    def exec_freetext_search(self, search_term):
+    @staticmethod
+    def exec_freetext_search(search_term, indices=('reframe', 'wikidata')):
         body = {
             "from": 0, "size": 100,
             "query": {
@@ -915,7 +921,7 @@ class SearchAPI(MethodView):
         }
 
         try:
-            res = es.search(index=['reframe', 'wikidata'], body=body)
+            res = es.search(index=indices, body=body)
         except Exception as e:
             raise e
 
@@ -934,7 +940,7 @@ class SearchAPI(MethodView):
                 # make sure that Wikidata item gets used (labels, etc)
                 for c, y in enumerate(results):
                     if y['id'] == compound_id:
-                        results[c] = self.retrieve_document(compound_id=compound_id, qid=qid)
+                        results[c] = SearchAPI.retrieve_document(compound_id=compound_id, qid=qid)
 
             found = False
             for y in results:
@@ -942,7 +948,7 @@ class SearchAPI(MethodView):
                     found = True
 
             if not found:
-                results.append(self.retrieve_document(compound_id=compound_id, qid=qid))
+                results.append(SearchAPI.retrieve_document(compound_id=compound_id, qid=qid))
 
         return results
 
@@ -977,7 +983,7 @@ class SearchAPI(MethodView):
             for c, x in enumerate(fingerprint_list):
                 tnmt = calculate_tanimoto(searched_cmpnd_fp, x)
                 if tnmt > tanimoto:
-                    search_result = self.retrieve_document(id_list[c])
+                    search_result = SearchAPI.retrieve_document(id_list[c])
                     search_result['tanimoto'] = tnmt
                     found_cmpnds.append(search_result)
 
@@ -997,7 +1003,7 @@ class SearchAPI(MethodView):
                 return make_response(jsonify({'status': 'fail, too complex search query', 'results': []})), 400
 
             try:
-                results = self.exec_freetext_search(search_term)
+                results = SearchAPI.exec_freetext_search(search_term)
             except Exception as e:
                 return make_response(jsonify({'status': 'fail', 'results': []})), 500
 
@@ -1024,7 +1030,7 @@ class SearchAPI(MethodView):
                 if search_mode == 'stereofree':
                     ikey = ikey[:15]
 
-                results = self.exec_freetext_search(ikey)
+                results = SearchAPI.exec_freetext_search(ikey)
             except Exception as e:
                 return make_response(jsonify({'status': 'fail', 'results': []})), 500
 
@@ -1113,6 +1119,9 @@ class CompoundSVGAPI(MethodView):
     def get(self):
         args = request.args
         compound_structure = args['structure']
+
+        if 'format' in args and args['format'] == 'inchikey':
+            compound_structure = SearchAPI.exec_freetext_search(compound_structure, indices=('reframe'))[0]['smiles']
 
         try:
             compound = Compound(compound_string=compound_structure, identifier_type='smiles')

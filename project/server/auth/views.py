@@ -1129,7 +1129,11 @@ class CompoundSVGAPI(MethodView):
         compound_structure = args['structure']
 
         if 'format' in args and args['format'] == 'inchikey':
-            compound_structure = SearchAPI.exec_freetext_search(compound_structure, indices=('reframe'))[0]['smiles']
+            search_results = SearchAPI.exec_freetext_search(compound_structure, indices=('reframe'))
+            for x in search_results:
+                if x['id'] == compound_structure:
+                    compound_structure = x['smiles']
+                    break
 
         try:
             compound = Compound(compound_string=compound_structure, identifier_type='smiles')

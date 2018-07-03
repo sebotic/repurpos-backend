@@ -804,6 +804,7 @@ class SearchAPI(MethodView):
             'aliases': [],
             'assay_types': [],  # list of available assay types
             'tanimoto': 0,
+            'similar_compounds': [],
             'reframeid': [],
             'smiles': '',
             'pubchem': '',
@@ -895,6 +896,13 @@ class SearchAPI(MethodView):
             search_result['properties'][1]['value'] = True
 
         search_result['assay_types'] = list(unique_assays)
+
+        # get similar compounds from separate index
+        if es.exists(index='similarity', doc_type='compound', id=compound_id):
+            similarity_results = es.get(index='similarity', doc_type='compound', id=compound_id)
+
+            if 'similar_compounds' in data:
+                search_result['similar_compounds'] = similarity_results['_source']['similar_compounds']
 
         return search_result
 

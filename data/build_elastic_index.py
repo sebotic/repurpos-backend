@@ -13,15 +13,20 @@ from elasticsearch.exceptions import RequestError
 es = Elasticsearch()
 
 
-# test_inchi = 'InChI=1S/C23H18ClF2N3O3S/c1-2-9-33(31,32)29-19-8-7-18(25)20(21(19)26)22(30)17-12-28-23-16(17)10-14(11-27-23)13-3-5-15(24)6-4-13/h3-8,10-12,29H,2,9H2,1H3,(H,27,28)'
-# cmpnd = Compound(compound_string=test_inchi, identifier_type='inchi')
-# print(cmpnd.get_inchi_key())
-
-def generate_fingerprint(smiles):
+def generate_fingerprint(smiles, compound_id, main_label, qid):
     if smiles:
         compound = Compound(compound_string=smiles, identifier_type='smiles', suppress_hydrogens=True)
         fingerprint = compound.get_bitmap_fingerprint()
         fp = {x for x in str(fingerprint)[1:-1].split(', ')}
+
+        # if only compound id is set as a label, try to set something more useful
+        if compound_id in compound_id_fp_map:
+            sim_item = compound_id_fp_map[compound_id]
+            if sim_item[1] == compound_id:
+                sim_item[1] = main_label
+        else:
+            compound_id_fp_map.update({compound_id: (compound_id, main_label, qid, fp)})
+
         return list(fp)
     else:
         return []
@@ -65,12 +70,21 @@ def desalt_compound(smiles):
 
 def get_rfm_ids(ikey):
     rfm_ids = []
+    chem_vendors = []
 
     for k, v in rfm_ikey_map.items():
-        if v == ikey:
+        s_id, s_vendor, s_vendor_id = v
+        if s_id == ikey:
             rfm_ids.append(k)
+            chem_vendors.append({'chem_vendor': s_vendor if pd.notnull(s_vendor) else '',
+                                 'chem_vendor_id': s_vendor_id if pd.notnull(s_vendor_id) else ''})
 
-    return rfm_ids
+    return rfm_ids, chem_vendors
+
+
+def calculate_tanimoto(fp_1, fp_2):
+    intersct = fp_1.intersection(fp_2)
+    return len(intersct)/(len(fp_1) + len(fp_2) - len(intersct))
 
 
 # index name 'reframe'
@@ -140,11 +154,15 @@ reframe_doc = {
 
     'reframe_id': [],
 
+    'chem_vendors': [],
+
     'qid': '',
 
     'alt_id': '',
 
     'fingerprint': [],
+
+    'similar_compounds': [],
 
     'gvk': {
 
@@ -177,8 +195,10 @@ assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_w_vendor_mapping.csv
 vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot.csv'), sep=',')
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
+compound_id_fp_map = {}
 
-rfm_ikey_map = {x['public_id']: x['ikey'] for x in vendor_dt[['public_id', 'ikey']].to_dict(orient='records')}
+rfm_ikey_map = {x['public_id']: (x['ikey'], x['library'], x['source_id']) for x in
+                vendor_dt[['public_id', 'ikey', 'library', 'source_id']].to_dict(orient='records')}
 
 for c, x in gvk_dt.iterrows():
     if x['exclude'] == 1:
@@ -193,7 +213,7 @@ for c, x in gvk_dt.iterrows():
 
     tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
-    tmp_obj['reframe_id'] = get_rfm_ids(ikey)
+    tmp_obj['reframe_id'], tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
 
     if ikey in ikey_wd_map:
         tmp_obj['qid'] = ikey_wd_map[ikey]
@@ -209,7 +229,8 @@ for c, x in gvk_dt.iterrows():
 
     if 'smiles' in tmp_obj['gvk']:
         smiles = tmp_obj['gvk']['smiles']
-        tmp_obj['fingerprint'] = generate_fingerprint(smiles)
+        main_label = tmp_obj['gvk']['drug_name'][0] if len(tmp_obj['gvk']['drug_name']) > 0 else ikey
+        tmp_obj['fingerprint'] = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
         d_smiles, d_ikey = desalt_compound(smiles)
         if len(d_smiles) > 1:
             tmp_obj['sub_smiles'] = d_smiles
@@ -236,7 +257,7 @@ for c, x in integrity_dt.iterrows():
 
     tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
-    tmp_obj['reframe_id'] = get_rfm_ids(ikey)
+    tmp_obj['reframe_id'], tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
 
     if ikey in ikey_wd_map:
         tmp_obj['qid'] = ikey_wd_map[ikey]
@@ -252,7 +273,8 @@ for c, x in integrity_dt.iterrows():
 
     if 'smiles' in tmp_obj['integrity']:
         smiles = tmp_obj['integrity']['smiles']
-        tmp_obj['fingerprint'] = generate_fingerprint(smiles)
+        main_label = tmp_obj['integrity']['drug_name'][0] if len(tmp_obj['integrity']['drug_name']) > 0 else ikey
+        tmp_obj['fingerprint'] = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
         d_smiles, d_ikey = desalt_compound(smiles)
         if len(d_smiles) > 1:
             tmp_obj['sub_smiles'] = d_smiles
@@ -277,7 +299,7 @@ for c, x in informa_dt.iterrows():
 
     tmp_obj = copy.deepcopy(reframe_doc)
     tmp_obj['ikey'] = ikey
-    tmp_obj['reframe_id'] = get_rfm_ids(ikey)
+    tmp_obj['reframe_id'], tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
 
     if ikey in ikey_wd_map:
         tmp_obj['qid'] = ikey_wd_map[ikey]
@@ -293,7 +315,8 @@ for c, x in informa_dt.iterrows():
 
     if 'smiles' in tmp_obj['informa']:
         smiles = tmp_obj['informa']['smiles']
-        tmp_obj['fingerprint'] = generate_fingerprint(smiles)
+        main_label = tmp_obj['informa']['drug_name'][0] if len(tmp_obj['informa']['drug_name']) > 0 else ikey
+        tmp_obj['fingerprint'] = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
         d_smiles, d_ikey = desalt_compound(smiles)
         if len(d_smiles) > 1:
             tmp_obj['sub_smiles'] = d_smiles
@@ -312,7 +335,8 @@ for i in assay_data['ikey'].unique():
 
     if ikey in ikey_wd_map:
         tmp_obj['qid'] = ikey_wd_map[ikey]
-        tmp_obj['reframe_id'] = get_rfm_ids(ikey)
+
+    tmp_obj['reframe_id'], tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
 
     if pd.isnull(ikey):
         continue
@@ -343,6 +367,32 @@ for i in assay_data['ikey'].unique():
         tmp_obj['assay'].append(tt)
 
     update_es(tmp_obj)
+
+for c, compound_id, values in enumerate(compound_id_fp_map.items()):
+    _, main_label, qid, fp = values
+
+    found_cmpnds = []
+    for r_id, (_, r_label, r_qid, r_fp) in compound_id_fp_map.items():
+        if compound_id == r_id:
+            continue
+
+        tnmt = calculate_tanimoto(fp, r_fp)
+        if tnmt > 0.85:
+            search_result = {'compound_id': r_id, 'qid': r_qid, 'score': tnmt, 'main_label': r_label}
+            found_cmpnds.append(search_result)
+
+    found_cmpnds.sort(key=lambda x: x['score'], reverse=True)
+
+    sim_obj = {
+        'ikey': compound_id,
+        'similar_compounds': found_cmpnds
+    }
+
+    update_es(sim_obj)
+
+    if c % 100 == 0:
+        print(c)
+
 
 body = {
     "query": {

@@ -32,21 +32,21 @@ def generate_fingerprint(smiles, compound_id, main_label, qid):
         return []
 
 
-def update_es(data):
+def update_es(data, index='reframe'):
     tmp_data = copy.deepcopy(data)
     ikey = tmp_data['ikey']
-    if es.exists(index='reframe', doc_type='compound', id=ikey):
-        for k, v in data.items():
-            if (type(v) == list or type(v) == dict) and len(v) == 0:
-                del tmp_data[k]
-            elif not v:
-                del tmp_data[k]
+    if es.exists(index=index, doc_type='compound', id=ikey):
+        # for k, v in data.items():
+        #     if (type(v) == list or type(v) == dict) and len(v) == 0:
+        #         del tmp_data[k]
+        #     elif not v:
+        #         del tmp_data[k]
 
-        es.update(index='reframe', id=ikey, doc_type='compound', body={'doc': tmp_data})
+        es.update(index=index, id=ikey, doc_type='compound', body={'doc': tmp_data})
     else:
         try:
             # if index does not yet exist, make sure that all fields are being added
-            res = es.index(index="reframe", doc_type='compound', id=ikey, body=data)
+            res = es.index(index=index, doc_type='compound', id=ikey, body=data)
 
         except RequestError as e:
             print(tmp_obj)
@@ -162,7 +162,7 @@ reframe_doc = {
 
     'fingerprint': [],
 
-    'similar_compounds': [],
+    #'similar_compounds': [],
 
     'gvk': {
 
@@ -391,7 +391,8 @@ for c, (compound_id, values) in enumerate(compound_id_fp_map.items()):
         'similar_compounds': found_cmpnds
     }
 
-    update_es(sim_obj)
+    if len(found_cmpnds) > 0:
+        update_es(sim_obj, index='similarity')
 
     if c % 100 == 0:
         print(c)

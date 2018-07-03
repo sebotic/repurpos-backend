@@ -368,7 +368,7 @@ for i in assay_data['ikey'].unique():
 
     update_es(tmp_obj)
 
-for c, compound_id, values in enumerate(compound_id_fp_map.items()):
+for c, (compound_id, values) in enumerate(compound_id_fp_map.items()):
     _, main_label, qid, fp = values
 
     found_cmpnds = []
@@ -382,6 +382,9 @@ for c, compound_id, values in enumerate(compound_id_fp_map.items()):
             found_cmpnds.append(search_result)
 
     found_cmpnds.sort(key=lambda x: x['score'], reverse=True)
+
+    if len(found_cmpnds) > 0:
+        print(found_cmpnds)
 
     sim_obj = {
         'ikey': compound_id,

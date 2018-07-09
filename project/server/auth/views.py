@@ -932,7 +932,7 @@ class SearchAPI(MethodView):
             "from": 0, "size": 100,
             "query": {
                 "multi_match": {
-                        "query": "*{}*".format(search_term),
+                        "query": "{}".format(search_term),
                         "operator": "AND",
 
 

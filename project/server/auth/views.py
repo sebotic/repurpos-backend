@@ -917,30 +917,30 @@ class SearchAPI(MethodView):
 
     @staticmethod
     def exec_freetext_search(search_term, indices=('reframe', 'wikidata')):
-        # body = {
-        #     "from": 0, "size": 100,
-        #     "query": {
-        #         "query_string": {
-        #             #"default_operator": "AND",
-        #
-        #             "query": "{}*".format(search_term)
-        #         }
-        #     }
-        # }
-
         body = {
             "from": 0, "size": 100,
             "query": {
-                "multi_match": {
-                        "query": "{}".format(search_term),
-                        "operator": "AND",
+                "query_string": {
+                    "default_operator": "AND",
 
-
-
-
+                    "query": "{}*".format(search_term)
                 }
             }
         }
+
+        # body = {
+        #     "from": 0, "size": 100,
+        #     "query": {
+        #         "multi_match": {
+        #                 "query": "{}".format(search_term),
+        #                 "operator": "AND",
+        #
+        #
+        #
+        #
+        #         }
+        #     }
+        # }
 
         try:
             res = es.search(index=indices, body=body)

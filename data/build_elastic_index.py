@@ -162,7 +162,7 @@ reframe_doc = {
 
     'fingerprint': [],
 
-    #'similar_compounds': [],
+    'similar_compounds': [],
 
     'gvk': {
 

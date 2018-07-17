@@ -851,7 +851,9 @@ class SearchAPI(MethodView):
                 search_result['properties'][2]['value'] = True
 
         if 'reframe_id' in data and len(data['reframe_id']) > 0:
-            search_result['reframeid'] = data['reframe_id']
+            search_result['reframeid'] = True
+        else:
+            search_result['reframeid'] = False
 
         aliases = set()
         for vendor, i in [('gvk', 3), ('informa', 5), ('integrity', 4)]:

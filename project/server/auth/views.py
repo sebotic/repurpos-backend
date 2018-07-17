@@ -852,6 +852,7 @@ class SearchAPI(MethodView):
 
         if 'reframe_id' in data and len(data['reframe_id']) > 0:
             search_result['reframeid'] = True
+            search_result['properties'][0]['value'] = True
         else:
             search_result['reframeid'] = False
 

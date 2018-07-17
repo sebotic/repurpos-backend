@@ -75,7 +75,7 @@ def get_rfm_ids(ikey):
     for k, v in rfm_ikey_map.items():
         s_id, s_vendor, s_vendor_id = v
         if s_id == ikey:
-            rfm_ids.append(k)
+            rfm_ids.append(True)
             chem_vendors.append({'chem_vendor': s_vendor if pd.notnull(s_vendor) else '',
                                  'chem_vendor_id': s_vendor_id if pd.notnull(s_vendor_id) else ''})
 

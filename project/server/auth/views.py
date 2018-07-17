@@ -805,7 +805,7 @@ class SearchAPI(MethodView):
             'assay_types': [],  # list of available assay types
             'tanimoto': 0,
             'similar_compounds': [],
-            'reframeid': [],
+            'reframeid': False,
             'smiles': '',
             'pubchem': '',
             'properties': [
@@ -850,7 +850,7 @@ class SearchAPI(MethodView):
             if qid:
                 search_result['properties'][2]['value'] = True
 
-        if 'reframe_id' in data:
+        if 'reframe_id' in data and len(data['reframe_id']) > 0:
             search_result['reframeid'] = data['reframe_id']
 
         aliases = set()
@@ -1193,46 +1193,46 @@ class DataAPI(MethodView):
         ikey = qid
         print(qid, ikey)
 
-        if auth_header:
-            try:
-                auth_token = auth_header.split(" ")[0]
-            except IndexError:
-                responseObject = {
-                    'status': 'fail',
-                    'message': 'Bearer token malformed.'
-                }
-                return make_response(jsonify(responseObject)), 401
-        else:
-            auth_token = ''
+        # if auth_header:
+        #     try:
+        #         auth_token = auth_header.split(" ")[0]
+        #     except IndexError:
+        #         responseObject = {
+        #             'status': 'fail',
+        #             'message': 'Bearer token malformed.'
+        #         }
+        #         return make_response(jsonify(responseObject)), 401
+        # else:
+        #     auth_token = ''
+        #
+        # if auth_token:
+        #     resp = User.decode_auth_token(auth_token)
+        #     if not isinstance(resp, str):
+        #         user = User.query.filter_by(id=resp).first()
+        #         if user.id:
+        try:
+            res = es.get(index="reframe", doc_type='compound', id=ikey)
+        except Exception as e:
+            # if there is no Elasticsearch backend running, try to serve some example data.
+            if qid in example_data:
+                response_object = {qid: example_data[qid], "status": "success"}
+                return make_response(jsonify(response_object)), 200
+            else:
+                return make_response(jsonify({'status': 'fail', 'ikeys': []})), 500
 
-        if auth_token:
-            resp = User.decode_auth_token(auth_token)
-            if not isinstance(resp, str):
-                user = User.query.filter_by(id=resp).first()
-                if user.id:
-                    try:
-                        res = es.get(index="reframe", doc_type='compound', id=ikey)
-                    except Exception as e:
-                        # if there is no Elasticsearch backend running, try to serve some example data.
-                        if qid in example_data:
-                            response_object = {qid: example_data[qid], "status": "success"}
-                            return make_response(jsonify(response_object)), 200
-                        else:
-                            return make_response(jsonify({'status': 'fail', 'ikeys': []})), 500
+        responseObject = {
+            'status': 'success',
+            qid: res['_source']
+        }
 
-                    responseObject = {
-                        'status': 'success',
-                        qid: res['_source']
-                    }
-
-                    return make_response(jsonify(responseObject)), 200
-
-        else:
-            responseObject = {
-                'status': 'fail',
-                'message': 'Provide a valid auth token.'
-            }
-            return make_response(jsonify(responseObject)), 401
+        return make_response(jsonify(responseObject)), 200
+        #
+        # else:
+        #     responseObject = {
+        #         'status': 'fail',
+        #         'message': 'Provide a valid auth token.'
+        #     }
+        #     return make_response(jsonify(responseObject)), 401
 
 
 # --- LDH ---

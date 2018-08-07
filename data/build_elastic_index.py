@@ -160,7 +160,7 @@ reframe_doc = {
 
     'alt_id': '',
 
-    'fingerprint': [],
+    # 'fingerprint': [],
 
     'similar_compounds': [],
 
@@ -230,7 +230,12 @@ for c, x in gvk_dt.iterrows():
     if 'smiles' in tmp_obj['gvk']:
         smiles = tmp_obj['gvk']['smiles']
         main_label = tmp_obj['gvk']['drug_name'][0] if len(tmp_obj['gvk']['drug_name']) > 0 else ikey
-        tmp_obj['fingerprint'] = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+        # tmp_obj['fingerprint'] = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+
+        fp = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+        if len(fp) > 0:
+            tmp_obj['fingerprint'] = fp
+
         d_smiles, d_ikey = desalt_compound(smiles)
         if len(d_smiles) > 1:
             tmp_obj['sub_smiles'] = d_smiles
@@ -274,7 +279,10 @@ for c, x in integrity_dt.iterrows():
     if 'smiles' in tmp_obj['integrity']:
         smiles = tmp_obj['integrity']['smiles']
         main_label = tmp_obj['integrity']['drug_name'][0] if len(tmp_obj['integrity']['drug_name']) > 0 else ikey
-        tmp_obj['fingerprint'] = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+
+        fp = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+        if len(fp) > 0:
+            tmp_obj['fingerprint'] = fp
         d_smiles, d_ikey = desalt_compound(smiles)
         if len(d_smiles) > 1:
             tmp_obj['sub_smiles'] = d_smiles
@@ -316,7 +324,9 @@ for c, x in informa_dt.iterrows():
     if 'smiles' in tmp_obj['informa']:
         smiles = tmp_obj['informa']['smiles']
         main_label = tmp_obj['informa']['drug_name'][0] if len(tmp_obj['informa']['drug_name']) > 0 else ikey
-        tmp_obj['fingerprint'] = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+        fp = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+        if len(fp) > 0:
+            tmp_obj['fingerprint'] = fp
         d_smiles, d_ikey = desalt_compound(smiles)
         if len(d_smiles) > 1:
             tmp_obj['sub_smiles'] = d_smiles
@@ -326,6 +336,35 @@ for c, x in informa_dt.iterrows():
 
     if c % 100 == 0:
         print(c)
+
+
+# for c, x in vendor_dt.iterrows():
+#     ikey = x['ikey']
+#     if pd.isnull(ikey):
+#         continue
+#
+#     if not es.exists(index='reframe', doc_type='compound', id=ikey) and ikey in ikey_wd_map:
+#         qid = ikey_wd_map[ikey]
+#         smiles = x['smiles']
+#
+#         tmp_obj = copy.deepcopy(reframe_doc)
+#         tmp_obj['ikey'] = ikey
+#         tmp_obj['reframe_id'], tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
+#         tmp_obj['qid'] = qid
+#
+#         update_es(tmp_obj)
+#
+#         if pd.notnull(smiles):
+#             main_label = tmp_obj['gvk']['drug_name'][0] if len(tmp_obj['gvk']['drug_name']) > 0 else ikey
+#             tmp_obj['fingerprint'] = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+#             d_smiles, d_ikey = desalt_compound(smiles)
+#             if len(d_smiles) > 1:
+#                 tmp_obj['sub_smiles'] = d_smiles
+#                 tmp_obj['sub_ikey'] = d_ikey
+#
+#     if c % 100 == 0:
+#         print(c)
+
 
 for i in assay_data['ikey'].unique():
     tmp_obj = copy.deepcopy(reframe_doc)

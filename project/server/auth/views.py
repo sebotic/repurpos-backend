@@ -201,10 +201,10 @@ def get_assay_details(assay_id):
 def get_assay_list():
     assays = []
 
-    for idx, assay in assay_descrip.sort_values(['indication', 'assay_type', 'title']).iterrows():
+    for idx, assay in assay_descrip.sort_values(['indication', 'assay_type', 'title_short']).iterrows():
         temp = {
             'assay_id': assay['assay_id'],
-            'title': assay['title'],
+            'title_short': assay['title_short'],
             'indication': assay['indication'],
             'assay_type': assay['assay_type'],
             'summary':  assay['summary']
@@ -1466,5 +1466,3 @@ auth_blueprint.add_url_rule(
     view_func=compound_svg_view,
     methods=['GET'],
 )
-
-

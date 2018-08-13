@@ -805,7 +805,7 @@ class SearchAPI(MethodView):
             'assay_types': [],  # list of available assay types
             'tanimoto': 0,
             'similar_compounds': [],
-            'reframeid': False,
+            'reframe_id': False,
             'smiles': '',
             'pubchem': '',
             'properties': [
@@ -851,10 +851,10 @@ class SearchAPI(MethodView):
                 search_result['properties'][2]['value'] = True
 
         if 'reframe_id' in data and len(data['reframe_id']) > 0:
-            search_result['reframeid'] = True
+            search_result['reframe_id'] = True
             search_result['properties'][0]['value'] = True
         else:
-            search_result['reframeid'] = False
+            search_result['reframe_id'] = False
 
         aliases = set()
         for vendor, i in [('gvk', 3), ('informa', 5), ('integrity', 4)]:

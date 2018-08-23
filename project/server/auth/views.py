@@ -17,6 +17,7 @@ import wikidataintegrator as wdi
 import requests
 import os
 import datetime
+import traceback
 
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError
@@ -805,7 +806,7 @@ class SearchAPI(MethodView):
             'assay_types': [],  # list of available assay types
             'tanimoto': 0,
             'similar_compounds': [],
-            'reframe_id': False,
+            'reframeid': False,
             'smiles': '',
             'pubchem': '',
             'properties': [
@@ -834,10 +835,10 @@ class SearchAPI(MethodView):
             except KeyError:
                 pass
 
-            if who_inn:
-                search_result['main_label'] = who_inn
-            elif wd_main_label:
-                search_result['main_label'] = wd_main_label
+            # if who_inn:
+            #     search_result['main_label'] = who_inn
+            # elif wd_main_label:
+            #     search_result['main_label'] = wd_main_label
 
         r = es.get(index='reframe', doc_type='compound', id=compound_id)
 
@@ -851,34 +852,64 @@ class SearchAPI(MethodView):
                 search_result['properties'][2]['value'] = True
 
         if 'reframe_id' in data and len(data['reframe_id']) > 0:
-            search_result['reframe_id'] = True
+            search_result['reframeid'] = True
             search_result['properties'][0]['value'] = True
         else:
-            search_result['reframe_id'] = False
+            search_result['reframeid'] = False
+
+        if 'smiles' in data:
+            search_result['smiles'] = data['smiles']
 
         aliases = set()
+        labels = set()
+
+        if wd_main_label:
+            labels.add(wd_main_label)
+
+
         for vendor, i in [('gvk', 3), ('informa', 5), ('integrity', 4)]:
-            if len(data[vendor]) == 0:
+
+            # make sure that if no data on a certain vendor exists, key is skipped
+            if vendor not in data or (vendor in data and len(data[vendor]) == 0):
                 continue
 
             search_result['properties'][i]['value'] = True
 
             if not who_inn or not wd_main_label:
-                search_result['main_label'] = data[vendor]['drug_name'][0]
-                aliases.update(data[vendor]['drug_name'][1:])
-            else:
-                aliases.update(data[vendor]['drug_name'])
+                # search_result['main_label'] = data[vendor][0]['drug_name'][0]
+                for x in data[vendor]:
+                    labels.add(x['drug_name'][0])
+
+                aliases.update(data[vendor][0]['drug_name'][1:])
+            elif who_inn:
+                aliases.update(data[vendor][0]['drug_name'])
                 aliases.discard(who_inn)
                 aliases.discard(wd_main_label)
 
             if 'synonyms' in data[vendor]:
-                aliases.update(data[vendor]['synonyms'])
+                aliases.update(data[vendor][0]['synonyms'])
 
-            if 'PubChem CID' in data[vendor]:
-                search_result['pubchem'] = data[vendor]['PubChem CID']
+            if 'PubChem CID' in data[vendor][0]:
+                search_result['pubchem'] = data[vendor][0]['PubChem CID']
 
             if 'smiles' in data[vendor] and not search_result['smiles']:
-                search_result['smiles'] = data[vendor]['smiles']
+                search_result['smiles'] = data[vendor][0]['smiles']
+
+        print('who', who_inn, 'wikidata', wd_main_label)
+        if not search_result['main_label']:
+            neg = [' ', ',', '-', '(']
+            cand_label = ''
+            max_splits = -1
+            for x in labels:
+                split_count = sum([len(x.split(s)) for s in neg])
+                if max_splits > -1 and split_count < max_splits:
+                    cand_label = x
+                    max_splits = split_count
+                elif max_splits == -1:
+                    cand_label = x
+                    max_splits = split_count
+
+            search_result['main_label'] = cand_label
 
         if not search_result['main_label'] and len(aliases) > 0:
             search_result['main_label'] = aliases.pop()
@@ -895,7 +926,7 @@ class SearchAPI(MethodView):
 
         unique_assays = set()
         for assay in data['assay']:
-            unique_assays.add((assay['assay_title'], assay['assay_id'] if 'assay_id' in assay else ''))
+            unique_assays.add((assay['title_short'], assay['assay_id'], assay['indication'] if 'assay_id' in assay else ''))
             search_result['properties'][1]['value'] = True
 
         search_result['assay_types'] = list(unique_assays)
@@ -957,6 +988,7 @@ class SearchAPI(MethodView):
 
             if x['_index'] == 'reframe':
                 compound_id = x['_id']
+                qid = x['_source']['qid']
             elif x['_index'] == 'wikidata':
                 qid = x['_id']
                 # get InChI key
@@ -1030,6 +1062,8 @@ class SearchAPI(MethodView):
             try:
                 results = SearchAPI.exec_freetext_search(search_term)
             except Exception as e:
+                print(e)
+                traceback.print_exc()
                 return make_response(jsonify({'status': 'fail', 'results': []})), 500
 
             responseObject = {

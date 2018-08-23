@@ -1,9 +1,9 @@
-# from cdk_pywrapper.cdk_pywrapper import Compound
-
 import pandas as pd
 import copy
 import json
 import os
+import sys
+import pprint
 
 import wikidataintegrator as wdi
 from cdk_pywrapper.cdk_pywrapper import Compound
@@ -55,6 +55,7 @@ def update_es(data, index='reframe'):
 def desalt_compound(smiles):
     desalted_smiles = []
     desalted_ikeys = []
+    # desalted_weights = []
     if smiles:
         for single_compound in smiles.split('.'):
             desalted_smiles.append(single_compound)
@@ -62,10 +63,13 @@ def desalt_compound(smiles):
                 compound = Compound(compound_string=single_compound, identifier_type='smiles')
                 ikey = compound.get_inchi_key()
                 desalted_ikeys.append(ikey)
+                # desalted_weights.append(float(compound.get_molecular_weight()))
             except Exception as e:
+                print('Inchi conversion failed', smiles)
                 desalted_ikeys.append('')
+                # desalted_weights.append(0)
 
-    return desalted_smiles, desalted_ikeys
+    return desalted_smiles, desalted_ikeys,  # desalted_weights
 
 
 def get_rfm_ids(ikey):
@@ -86,6 +90,128 @@ def calculate_tanimoto(fp_1, fp_2):
     intersct = fp_1.intersection(fp_2)
     return len(intersct)/(len(fp_1) + len(fp_2) - len(intersct))
 
+
+def generate_unifiers(df, smiles_col, vendor_id_col):
+    for c, x in df.iterrows():
+        ikey = x['ikey']
+        smiles = x[smiles_col]  # sub_smiles for GVK!
+
+        if pd.isnull(smiles):
+            continue
+
+        smiles = smiles.split(' |')[0]
+
+        if pd.isnull(ikey):
+            if pd.notnull(x[vendor_id_col]):
+                df.loc[c, 'uikey'] = str(x[vendor_id_col])
+                continue
+            else:
+                continue
+
+        d_smiles, d_ikey = desalt_compound(smiles)
+
+        if 1 < len(d_smiles):
+            # do not unify when there are more than 3 compounds in a mixture
+            if len(d_smiles) > 4:
+                continue
+
+            ''' 
+            make sure that only if all subsmiles convert to ikeys, the compound/mixture is unified, otherwise
+            there is a substantial risk of secondary comopunds/salts will be unified. '''
+            if len([x for x in d_ikey if x]) < len(d_ikey):
+                continue
+
+            d_counts = []
+            for ik in d_ikey:
+
+                tmp_salt = salt_frequencies.loc[salt_frequencies['ikey'] == ik, :]
+                compound_count = tmp_salt['counts'].sum()
+                d_counts.append((ik, compound_count))
+
+            d_ikey = [x for _, x in sorted(zip(d_counts, d_ikey), key=lambda pair: pair[0][1])]
+            d_smiles = [x for _, x in sorted(zip(d_counts, d_smiles), key=lambda pair: pair[0][1])]
+
+            d_counts.sort(key=lambda x: x[1])
+
+            df.loc[c, 'uikey'] = d_ikey[0]
+            df.loc[c, 'usmiles'] = d_smiles[0]
+
+        else:
+            df.loc[c, 'uikey'] = ikey
+            df.loc[c, 'usmiles'] = smiles
+
+    return df
+
+
+def generate_vendor_index(dt, vendor_string, doc_map):
+    for counter, uid in enumerate(dt['uikey'].unique()):
+        ikey = uid
+        if pd.isnull(ikey):
+            continue
+
+        tmp_obj = copy.deepcopy(reframe_doc)
+        tmp_obj['ikey'] = ikey
+        rf, cv = get_rfm_ids(ikey)
+        if len(rf) > 0:
+            tmp_obj['reframe_id'] = rf
+        if len(cv) > 0:
+            tmp_obj['chem_vendors'] = cv
+        tmp_obj[vendor_string] = []
+
+        if ikey in ikey_wd_map:
+            tmp_obj['qid'] = ikey_wd_map[ikey]
+
+        tmp_df = dt.loc[dt['uikey'] == uid]
+        # if tmp_df.shape[0] > 1:
+        #     print(tmp_df)
+        for c, x in tmp_df.iterrows():
+
+            if x['exclude'] == 1:
+                continue
+
+            # add desalted smiles to 'root' of document for structure drawing
+            if pd.notnull(x['usmiles']):
+                if 'smiles' in tmp_obj and tmp_obj['smiles']:
+                    pass
+                elif 'smiles' not in tmp_obj or not tmp_obj['smiles']:
+                    tmp_obj['smiles'] = x['usmiles']
+
+            single_comp_dict = {}
+            for k, v in doc_map.items():
+                if pd.isnull(x[k]) or v is None:
+                    continue
+                if type(v) == tuple:
+                    single_comp_dict.update({v[0]: x[k].split(v[1])})
+
+                else:
+                    single_comp_dict.update({v: x[k]})
+
+            if 'smiles' in single_comp_dict and single_comp_dict['smiles']:
+
+                smiles = single_comp_dict['smiles']
+                main_label = single_comp_dict['drug_name'][0] if len(single_comp_dict['drug_name']) > 0 else ikey
+                # tmp_obj['fingerprint'] = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+
+                fp = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+                if len(fp) > 0:
+                    tmp_obj['fingerprint'] = fp
+
+                d_smiles, d_ikey = desalt_compound(smiles)
+                if len(d_smiles) > 1:
+                    single_comp_dict['sub_smiles'] = d_smiles
+                    single_comp_dict['sub_ikey'] = d_ikey
+
+            tmp_obj[vendor_string].append(single_comp_dict)
+
+        update_es(tmp_obj)
+
+        # pprint.pprint(tmp_obj)
+
+        # if c > 20:
+        #     break
+
+        if counter % 100 == 0:
+            print(counter)
 
 # index name 'reframe'
 
@@ -134,7 +260,7 @@ informa_doc_map = {
 }
 
 assay_data_doc_map = {
-    'calibr_id': 'reframe_id',
+    #'calibr_id': 'reframe_id',
     'ac50': 'ac50',
     'datamode': 'datamode',
     'genedata_id': 'assay_id',
@@ -152,7 +278,7 @@ assay_data_doc_map = {
 reframe_doc = {
     'ikey': '',
 
-    'reframe_id': [],
+    # 'reframe_id': [],
 
     'chem_vendors': [],
 
@@ -164,15 +290,9 @@ reframe_doc = {
 
     'similar_compounds': [],
 
-    'gvk': {
-
-    },
-    'integrity': {
-
-    },
-    'informa': {
-
-    },
+    # 'gvk': [],
+    # 'integrity': [],
+    # 'informa': [],
     'assay': []
 
 }
@@ -193,6 +313,7 @@ informa_dt = pd.read_csv(os.path.join(data_dir, '20180430_Informa_excluded_colum
 assay_descr = pd.read_csv(os.path.join(data_dir, '20180222_assay_descriptions.csv'), header=0)
 assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_w_vendor_mapping.csv'), header=0)
 vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot.csv'), sep=',')
+salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'))
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 compound_id_fp_map = {}
@@ -200,142 +321,154 @@ compound_id_fp_map = {}
 rfm_ikey_map = {x['public_id']: (x['ikey'], x['library'], x['source_id']) for x in
                 vendor_dt[['public_id', 'ikey', 'library', 'source_id']].to_dict(orient='records')}
 
-for c, x in gvk_dt.iterrows():
-    if x['exclude'] == 1:
-        continue
-
-    ikey = x['ikey']
-    if pd.isnull(ikey):
-        if pd.notnull(x['gvk_id']):
-            ikey = str(x['gvk_id'])
-        else:
-            continue
-
-    tmp_obj = copy.deepcopy(reframe_doc)
-    tmp_obj['ikey'] = ikey
-    tmp_obj['reframe_id'], tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
-
-    if ikey in ikey_wd_map:
-        tmp_obj['qid'] = ikey_wd_map[ikey]
-
-    for k, v in gvk_doc_map.items():
-        if pd.isnull(x[k]) or v is None:
-            continue
-        if type(v) == tuple:
-            tmp_obj['gvk'].update({v[0]: x[k].split(v[1])})
-
-        else:
-            tmp_obj['gvk'].update({v: x[k]})
-
-    if 'smiles' in tmp_obj['gvk']:
-        smiles = tmp_obj['gvk']['smiles']
-        main_label = tmp_obj['gvk']['drug_name'][0] if len(tmp_obj['gvk']['drug_name']) > 0 else ikey
-        # tmp_obj['fingerprint'] = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
-
-        fp = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
-        if len(fp) > 0:
-            tmp_obj['fingerprint'] = fp
-
-        d_smiles, d_ikey = desalt_compound(smiles)
-        if len(d_smiles) > 1:
-            tmp_obj['sub_smiles'] = d_smiles
-            tmp_obj['sub_ikey'] = d_ikey
-
-    update_es(tmp_obj)
-
-    # if c > 20:
-    #     break
-
-    if c % 100 == 0:
-        print(c)
-
-for c, x in integrity_dt.iterrows():
-    if x['exclude'] == 1:
-        continue
-
-    ikey = x['ikey']
-    if pd.isnull(ikey):
-        if pd.notnull(x['id']):
-            ikey = str(x['id'])
-        else:
-            continue
-
-    tmp_obj = copy.deepcopy(reframe_doc)
-    tmp_obj['ikey'] = ikey
-    tmp_obj['reframe_id'], tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
-
-    if ikey in ikey_wd_map:
-        tmp_obj['qid'] = ikey_wd_map[ikey]
-
-    for k, v in integrity_doc_map.items():
-        if pd.isnull(x[k]) or v is None:
-            continue
-        if type(v) == tuple:
-            tmp_obj['integrity'].update({v[0]: x[k].split(v[1])})
-
-        else:
-            tmp_obj['integrity'].update({v: x[k]})
-
-    if 'smiles' in tmp_obj['integrity']:
-        smiles = tmp_obj['integrity']['smiles']
-        main_label = tmp_obj['integrity']['drug_name'][0] if len(tmp_obj['integrity']['drug_name']) > 0 else ikey
-
-        fp = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
-        if len(fp) > 0:
-            tmp_obj['fingerprint'] = fp
-        d_smiles, d_ikey = desalt_compound(smiles)
-        if len(d_smiles) > 1:
-            tmp_obj['sub_smiles'] = d_smiles
-            tmp_obj['sub_ikey'] = d_ikey
-
-    update_es(tmp_obj)
-
-    if c % 100 == 0:
-        print(c)
+# add unifying ikeys and smiles to vendor data dataframes, use vendor specific id as replacement if
+# no ikey can be generated
+gvk_dt = generate_unifiers(gvk_dt, 'sub_smiles', 'gvk_id')
+integrity_dt = generate_unifiers(integrity_dt, 'smiles', 'id')
+informa_dt = generate_unifiers(informa_dt, 'smiles', 'informa_id')
 
 
-for c, x in informa_dt.iterrows():
-    if x['exclude'] == 1:
-        continue
+generate_vendor_index(gvk_dt, 'gvk', gvk_doc_map)
+generate_vendor_index(integrity_dt, 'integrity', integrity_doc_map)
+generate_vendor_index(informa_dt, 'informa', informa_doc_map)
 
-    ikey = x['ikey']
-    if pd.isnull(ikey):
-        if pd.notnull(x['informa_id']):
-            ikey = str(x['informa_id'])
-        else:
-            continue
-
-    tmp_obj = copy.deepcopy(reframe_doc)
-    tmp_obj['ikey'] = ikey
-    tmp_obj['reframe_id'], tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
-
-    if ikey in ikey_wd_map:
-        tmp_obj['qid'] = ikey_wd_map[ikey]
-
-    for k, v in informa_doc_map.items():
-        if pd.isnull(x[k]) or v is None:
-            continue
-        if type(v) == tuple:
-            tmp_obj['informa'].update({v[0]: x[k].split(v[1])})
-
-        else:
-            tmp_obj['informa'].update({v: x[k]})
-
-    if 'smiles' in tmp_obj['informa']:
-        smiles = tmp_obj['informa']['smiles']
-        main_label = tmp_obj['informa']['drug_name'][0] if len(tmp_obj['informa']['drug_name']) > 0 else ikey
-        fp = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
-        if len(fp) > 0:
-            tmp_obj['fingerprint'] = fp
-        d_smiles, d_ikey = desalt_compound(smiles)
-        if len(d_smiles) > 1:
-            tmp_obj['sub_smiles'] = d_smiles
-            tmp_obj['sub_ikey'] = d_ikey
-
-    update_es(tmp_obj)
-
-    if c % 100 == 0:
-        print(c)
+# for counter, uid in enumerate(gvk_dt['uikey'].unique()):
+#     ikey = uid
+#     if pd.isnull(ikey):
+#         continue
+#
+#     tmp_obj = copy.deepcopy(reframe_doc)
+#     tmp_obj['ikey'] = ikey
+#     tmp_obj['reframe_id'], tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
+#
+#     if ikey in ikey_wd_map:
+#         tmp_obj['qid'] = ikey_wd_map[ikey]
+#
+#     for c, x in gvk_dt.iterrows():
+#         if x['exclude'] == 1:
+#             continue
+#
+#         single_comp_dict = {}
+#         for k, v in gvk_doc_map.items():
+#             if pd.isnull(x[k]) or v is None:
+#                 continue
+#             if type(v) == tuple:
+#                 single_comp_dict.update({v[0]: x[k].split(v[1])})
+#
+#             else:
+#                 single_comp_dict.update({v: x[k]})
+#
+#         if 'smiles' in tmp_obj['gvk']:
+#             smiles = single_comp_dict['smiles']
+#             main_label = single_comp_dict['drug_name'][0] if len(single_comp_dict['drug_name']) > 0 else ikey
+#             # tmp_obj['fingerprint'] = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+#
+#             fp = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+#             if len(fp) > 0:
+#                 tmp_obj['fingerprint'] = fp
+#
+#             d_smiles, d_ikey, _ = desalt_compound(smiles)
+#             if len(d_smiles) > 1:
+#                 single_comp_dict['sub_smiles'] = d_smiles
+#                 single_comp_dict['sub_ikey'] = d_ikey
+#
+#         tmp_obj['gvk'].append(single_comp_dict)
+#
+#     update_es(tmp_obj)
+#
+#     # if c > 20:
+#     #     break
+#
+#     if counter % 100 == 0:
+#         print(counter)
+#
+# for c, x in integrity_dt.iterrows():
+#     if x['exclude'] == 1:
+#         continue
+#
+#     ikey = x['ikey']
+#     if pd.isnull(ikey):
+#         if pd.notnull(x['id']):
+#             ikey = str(x['id'])
+#         else:
+#             continue
+#
+#     tmp_obj = copy.deepcopy(reframe_doc)
+#     tmp_obj['ikey'] = ikey
+#     tmp_obj['reframe_id'], tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
+#
+#     if ikey in ikey_wd_map:
+#         tmp_obj['qid'] = ikey_wd_map[ikey]
+#
+#     for k, v in integrity_doc_map.items():
+#         if pd.isnull(x[k]) or v is None:
+#             continue
+#         if type(v) == tuple:
+#             tmp_obj['integrity'].update({v[0]: x[k].split(v[1])})
+#
+#         else:
+#             tmp_obj['integrity'].update({v: x[k]})
+#
+#     if 'smiles' in tmp_obj['integrity']:
+#         smiles = tmp_obj['integrity']['smiles']
+#         main_label = tmp_obj['integrity']['drug_name'][0] if len(tmp_obj['integrity']['drug_name']) > 0 else ikey
+#
+#         fp = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+#         if len(fp) > 0:
+#             tmp_obj['fingerprint'] = fp
+#         d_smiles, d_ikey, _ = desalt_compound(smiles)
+#         if len(d_smiles) > 1:
+#             tmp_obj['sub_smiles'] = d_smiles
+#             tmp_obj['sub_ikey'] = d_ikey
+#
+#     update_es(tmp_obj)
+#
+#     if c % 100 == 0:
+#         print(c)
+#
+#
+# for c, x in informa_dt.iterrows():
+#     if x['exclude'] == 1:
+#         continue
+#
+#     ikey = x['ikey']
+#     if pd.isnull(ikey):
+#         if pd.notnull(x['informa_id']):
+#             ikey = str(x['informa_id'])
+#         else:
+#             continue
+#
+#     tmp_obj = copy.deepcopy(reframe_doc)
+#     tmp_obj['ikey'] = ikey
+#     tmp_obj['reframe_id'], tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
+#
+#     if ikey in ikey_wd_map:
+#         tmp_obj['qid'] = ikey_wd_map[ikey]
+#
+#     for k, v in informa_doc_map.items():
+#         if pd.isnull(x[k]) or v is None:
+#             continue
+#         if type(v) == tuple:
+#             tmp_obj['informa'].update({v[0]: x[k].split(v[1])})
+#
+#         else:
+#             tmp_obj['informa'].update({v: x[k]})
+#
+#     if 'smiles' in tmp_obj['informa']:
+#         smiles = tmp_obj['informa']['smiles']
+#         main_label = tmp_obj['informa']['drug_name'][0] if len(tmp_obj['informa']['drug_name']) > 0 else ikey
+#         fp = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
+#         if len(fp) > 0:
+#             tmp_obj['fingerprint'] = fp
+#         d_smiles, d_ikey, _ = desalt_compound(smiles)
+#         if len(d_smiles) > 1:
+#             tmp_obj['sub_smiles'] = d_smiles
+#             tmp_obj['sub_ikey'] = d_ikey
+#
+#     update_es(tmp_obj)
+#
+#     if c % 100 == 0:
+#         print(c)
 
 
 # for c, x in vendor_dt.iterrows():
@@ -375,14 +508,18 @@ for i in assay_data['ikey'].unique():
     if ikey in ikey_wd_map:
         tmp_obj['qid'] = ikey_wd_map[ikey]
 
-    tmp_obj['reframe_id'], tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
+    _, tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
 
     if pd.isnull(ikey):
         continue
 
     for c, x in assay_data.loc[assay_data['ikey'] == i, :].iterrows():
 
-        tt = {}
+        tt = {
+            'assay_id': '',
+            'title_short': '',
+            'indication': ''
+        }
 
         for k, v in assay_data_doc_map.items():
             if pd.isnull(x[k]) or v is None:
@@ -402,6 +539,14 @@ for i in assay_data['ikey'].unique():
                 continue
 
             tt.update({v: x[k]})
+
+            # add indication and short assay title from assay descriptions
+            if v == 'assay_id':
+                aid = tt['assay_id']
+                for cc, ad in assay_descr.iterrows():
+                    if aid == ad['assay_id']:
+                        tt['title_short'] = ad['title_short']
+                        tt['indication'] = ad['indication']
 
         tmp_obj['assay'].append(tt)
 

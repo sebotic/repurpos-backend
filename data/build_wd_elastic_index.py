@@ -6,6 +6,17 @@ es = Elasticsearch()
 
 
 # retrieve all QIDs from the populated reframe ES index
+
+qid_list = []
+
+
+def process_batch(batch):
+    for count, hit in enumerate(batch['hits']['hits']):
+        qid = hit['_source']['qid']
+        if qid:
+            qid_list.append(qid)
+
+
 body = {
     "_source": {
         "includes": ["qid"],
@@ -17,12 +28,27 @@ body = {
             "fields": ['qid']
         }
     },
-    "from": 0, "size": 10000,
+    "sort": [
+        "_doc"
+    ],
+    'size': 9999
 }
 
 es.indices.refresh(index="reframe")
 
-r = es.search(index="reframe", body=body)
+r = es.search(index="reframe", body=body, scroll='1m')
+scroll_id = r['_scroll_id']
+process_batch(r)
+
+while True:
+    r = es.scroll(scroll='1m', scroll_id=scroll_id)
+    print(r)
+    if len(r['hits']['hits']) == 0:
+        break
+    process_batch(r)
+
+
+print(len(qid_list))
 
 bd = {
     'mapping': {
@@ -35,15 +61,15 @@ bd = {
 c = client.IndicesClient(es)
 # check if index exists, otherwise, create
 if c.exists(index='wikidata'):
+    c.delete(index='wikidata')
 
-    c.put_settings(index='wikidata', body=bd)
-else:
-    c.create(index='wikidata', body=bd)
+#     c.put_settings(index='wikidata', body=bd)
+# else:
+c.create(index='wikidata', body=bd)
 
 session = requests.Session()
 
-for count, hit in enumerate(r['hits']['hits']):
-    qid = hit['_source']['qid']
+for count, qid in enumerate(qid_list):
 
     header = {
         'Accept': 'application/json'
@@ -61,13 +87,13 @@ for count, hit in enumerate(r['hits']['hits']):
             if 'references' in x:
                 del x['references']
 
-    if es.exists(index='wikidata', doc_type='compound', id=qid):
+    if es.exists(index='wikidata', doc_type='compound', id=qid, request_timeout=30):
         # print('this exists!!')
-        es.update(index='wikidata', id=qid, doc_type='compound', body={'doc': obj})
+        es.update(index='wikidata', id=qid, doc_type='compound', body={'doc': obj}, request_timeout=30)
         # pass
     else:
         try:
-            res = es.index(index="wikidata", doc_type='compound', id=qid, body=obj)
+            res = es.index(index="wikidata", doc_type='compound', id=qid, body=obj, request_timeout=30)
 
         except RequestError as e:
             print(e)

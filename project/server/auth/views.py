@@ -835,8 +835,8 @@ class SearchAPI(MethodView):
             except KeyError:
                 pass
 
-            # if who_inn:
-            #     search_result['main_label'] = who_inn
+            if who_inn:
+                search_result['main_label'] = who_inn
             # elif wd_main_label:
             #     search_result['main_label'] = wd_main_label
 
@@ -866,7 +866,6 @@ class SearchAPI(MethodView):
         if wd_main_label:
             labels.add(wd_main_label)
 
-
         for vendor, i in [('gvk', 3), ('informa', 5), ('integrity', 4)]:
 
             # make sure that if no data on a certain vendor exists, key is skipped
@@ -875,16 +874,10 @@ class SearchAPI(MethodView):
 
             search_result['properties'][i]['value'] = True
 
-            if not who_inn or not wd_main_label:
-                # search_result['main_label'] = data[vendor][0]['drug_name'][0]
-                for x in data[vendor]:
-                    labels.add(x['drug_name'][0])
-
-                aliases.update(data[vendor][0]['drug_name'][1:])
-            elif who_inn:
+            # collect all label candidates and aliases
+            for x in data[vendor]:
+                labels.add(x['drug_name'][0])
                 aliases.update(data[vendor][0]['drug_name'])
-                aliases.discard(who_inn)
-                aliases.discard(wd_main_label)
 
             if 'synonyms' in data[vendor]:
                 aliases.update(data[vendor][0]['synonyms'])
@@ -895,7 +888,6 @@ class SearchAPI(MethodView):
             if 'smiles' in data[vendor] and not search_result['smiles']:
                 search_result['smiles'] = data[vendor][0]['smiles']
 
-        print('who', who_inn, 'wikidata', wd_main_label)
         if not search_result['main_label']:
             neg = [' ', ',', '-', '(']
             cand_label = ''

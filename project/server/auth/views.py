@@ -823,7 +823,7 @@ class SearchAPI(MethodView):
         wd_main_label = ''
         who_inn = ''
 
-        if qid:
+        if qid and es.exists(index='wikidata', doc_type='compound', id=qid):
             wd_r = es.get(index='wikidata', doc_type='compound', id=qid)
             wd_data = wd_r['_source']
             if 'en' in wd_data['labels']:

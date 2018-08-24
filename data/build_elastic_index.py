@@ -55,7 +55,7 @@ def update_es(data, index='reframe'):
 def desalt_compound(smiles):
     desalted_smiles = []
     desalted_ikeys = []
-    # desalted_weights = []
+    desalted_weights = []
     if smiles:
         for single_compound in smiles.split('.'):
             desalted_smiles.append(single_compound)
@@ -63,13 +63,13 @@ def desalt_compound(smiles):
                 compound = Compound(compound_string=single_compound, identifier_type='smiles')
                 ikey = compound.get_inchi_key()
                 desalted_ikeys.append(ikey)
-                # desalted_weights.append(float(compound.get_molecular_weight()))
+                desalted_weights.append(float(compound.get_molecular_weight()))
             except Exception as e:
                 print('Inchi conversion failed', smiles)
                 desalted_ikeys.append('')
-                # desalted_weights.append(0)
+                desalted_weights.append(0)
 
-    return desalted_smiles, desalted_ikeys,  # desalted_weights
+    return desalted_smiles, desalted_ikeys, desalted_weights
 
 
 def get_rfm_ids(ikey):
@@ -108,11 +108,13 @@ def generate_unifiers(df, smiles_col, vendor_id_col):
             else:
                 continue
 
-        d_smiles, d_ikey = desalt_compound(smiles)
+        d_smiles, d_ikey, d_weights = desalt_compound(smiles)
 
         if 1 < len(d_smiles):
-            # do not unify when there are more than 3 compounds in a mixture
-            if len(d_smiles) > 4:
+            # do not unify when there are more than 3 compounds in a mixture or more than 2 compounds with weight >200Da
+            if len(d_smiles) > 4 or len([w for w in d_weights if w >= 200]) > 1:
+                df.loc[c, 'uikey'] = ikey
+                df.loc[c, 'usmiles'] = smiles
                 continue
 
             ''' 
@@ -196,7 +198,7 @@ def generate_vendor_index(dt, vendor_string, doc_map):
                 if len(fp) > 0:
                     tmp_obj['fingerprint'] = fp
 
-                d_smiles, d_ikey = desalt_compound(smiles)
+                d_smiles, d_ikey, _ = desalt_compound(smiles)
                 if len(d_smiles) > 1:
                     single_comp_dict['sub_smiles'] = d_smiles
                     single_comp_dict['sub_ikey'] = d_ikey

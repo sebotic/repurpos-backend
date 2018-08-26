@@ -8,7 +8,7 @@ es = Elasticsearch()
 # retrieve all QIDs from the populated reframe ES index
 
 qid_list = []
-
+only_add_missing = True
 
 def process_batch(batch):
     for count, hit in enumerate(batch['hits']['hits']):
@@ -60,16 +60,21 @@ bd = {
 
 c = client.IndicesClient(es)
 # check if index exists, otherwise, create
-if c.exists(index='wikidata'):
-    c.delete(index='wikidata')
+if not only_add_missing:
+    if c.exists(index='wikidata'):
+        c.delete(index='wikidata')
 
-#     c.put_settings(index='wikidata', body=bd)
-# else:
-c.create(index='wikidata', body=bd)
+    #     c.put_settings(index='wikidata', body=bd)
+    # else:
+    c.create(index='wikidata', body=bd)
 
 session = requests.Session()
 
 for count, qid in enumerate(qid_list):
+
+    if only_add_missing:
+        if es.exists(index='wikidata', doc_type='compound', id=qid):
+            continue
 
     header = {
         'Accept': 'application/json'

@@ -91,6 +91,14 @@ def calculate_tanimoto(fp_1, fp_2):
     return len(intersct)/(len(fp_1) + len(fp_2) - len(intersct))
 
 
+def add_to_no_charge_list(ikey):
+    sub_ikey = ikey[:25]
+    if sub_ikey in no_charge_map:
+        no_charge_map[sub_ikey].append(ikey)
+    else:
+        no_charge_map.update({sub_ikey: [ikey]})
+
+
 def generate_unifiers(df, smiles_col, vendor_id_col):
     for c, x in df.iterrows():
         ikey = x['ikey']
@@ -104,23 +112,29 @@ def generate_unifiers(df, smiles_col, vendor_id_col):
         if pd.isnull(ikey):
             if pd.notnull(x[vendor_id_col]):
                 df.loc[c, 'uikey'] = str(x[vendor_id_col])
+                add_to_no_charge_list(df.loc[c, 'uikey'])
                 continue
             else:
                 continue
+        no_split_metals = ['[Zn++]', '[Gd+3]', '[Al+3]', '[Fe+3]', '[Fe+2]', '[Zn++]', '[Zn+2]', '[Sr+2]', '[Sb+3]',
+                           '[Pt+2]', '[H][Sr][H]', '[Pt++]', '[Cu++]', '[Fe]', '[Co+3]', '[Au+]', '[Ag+]', 'II',
+                           '[Mn++]', '[La+3]', '[IH-]', '[Ga+3]', '[Dy+3]', '[Cu+2]', '[Ce+]', 'O[Al++]',
+                           'N[Pt++]N', 'Cl[Pt]Cl', 'Cl[Pt+]', 'CC[Hg+]', '[Li+]']
 
-        d_smiles, d_ikey, d_weights = desalt_compound(smiles)
+        d_smiles, d_ikey, d_masses = desalt_compound(smiles)
 
-        if 1 < len(d_smiles):
-            # do not unify when there are more than 3 compounds in a mixture or more than 2 compounds with weight >200Da
-            if len(d_smiles) > 4 or len([w for w in d_weights if w >= 200]) > 1:
+        if 1 < len(d_smiles) and not any([x in smiles for x in no_split_metals]):
+            '''
+            do not unify when there are more than 3 compounds in a mixture or
+            more than 2 compounds with a molecular weight >=195Da. 
+            Also, make sure that only if all subsmiles convert to ikeys, the compound/mixture is unified, otherwise
+            there is a substantial risk of secondary comopunds/salts will be unified.
+            '''
+            if len(d_smiles) > 4 or len([w for w in d_masses if w >= 195]) > 1 or \
+                    len([x for x in d_ikey if x]) < len(d_ikey):
                 df.loc[c, 'uikey'] = ikey
                 df.loc[c, 'usmiles'] = smiles
-                continue
-
-            ''' 
-            make sure that only if all subsmiles convert to ikeys, the compound/mixture is unified, otherwise
-            there is a substantial risk of secondary comopunds/salts will be unified. '''
-            if len([x for x in d_ikey if x]) < len(d_ikey):
+                add_to_no_charge_list(ikey)
                 continue
 
             d_counts = []
@@ -130,17 +144,32 @@ def generate_unifiers(df, smiles_col, vendor_id_col):
                 compound_count = tmp_salt['counts'].sum()
                 d_counts.append((ik, compound_count))
 
-            d_ikey = [x for _, x in sorted(zip(d_counts, d_ikey), key=lambda pair: pair[0][1])]
-            d_smiles = [x for _, x in sorted(zip(d_counts, d_smiles), key=lambda pair: pair[0][1])]
+            d_ikey_freq = [x for _, x in sorted(zip(d_counts, d_ikey), key=lambda pair: pair[0][1])]
+            d_smiles_freq = [x for _, x in sorted(zip(d_counts, d_smiles), key=lambda pair: pair[0][1])]
+            d_counts_freq = [x for _, x in sorted(zip(d_counts, d_counts), key=lambda pair: pair[0][1])]
+            # d_counts.sort(key=lambda x: x[1])
 
-            d_counts.sort(key=lambda x: x[1])
+            d_ikey_mass = [x for _, x in sorted(zip(d_masses, d_ikey), key=lambda pair: pair[0], reverse=True)]
+            d_smiles_mass = [x for _, x in sorted(zip(d_masses, d_smiles), key=lambda pair: pair[0], reverse=True)]
+            d_counts_mass = [x for _, x in sorted(zip(d_masses, d_counts), key=lambda pair: pair[0], reverse=True)]
+            d_masses.sort(reverse=True)
 
-            df.loc[c, 'uikey'] = d_ikey[0]
-            df.loc[c, 'usmiles'] = d_smiles[0]
+            '''
+            if the count differences btw 2 compounds are < 3, take the one with largest mass, else take the one
+            with largest frequency.
+            '''
+            if abs(d_counts_mass[0][1] - d_counts_mass[1][1]) < 3:
+                df.loc[c, 'uikey'] = d_ikey_mass[0]
+                df.loc[c, 'usmiles'] = d_smiles_mass[0]
+            else:
+                df.loc[c, 'uikey'] = d_ikey_freq[0]
+                df.loc[c, 'usmiles'] = d_smiles_freq[0]
 
         else:
             df.loc[c, 'uikey'] = ikey
             df.loc[c, 'usmiles'] = smiles
+
+        add_to_no_charge_list(df.loc[c, 'uikey'])
 
     return df
 
@@ -151,17 +180,21 @@ def generate_vendor_index(dt, vendor_string, doc_map):
         if pd.isnull(ikey):
             continue
 
+        # ensure that document resolves to one primary ikey covering all compounds with same skeleton and stereochem
+        no_charge_map[ikey[:25]].sort(key=lambda s: s[-1], reverse=True)
+        primary_ikey = no_charge_map[ikey[:25]][0]
+
         tmp_obj = copy.deepcopy(reframe_doc)
-        tmp_obj['ikey'] = ikey
-        rf, cv = get_rfm_ids(ikey)
+        tmp_obj['ikey'] = primary_ikey
+        rf, cv = get_rfm_ids(primary_ikey)
         if len(rf) > 0:
             tmp_obj['reframe_id'] = rf
         if len(cv) > 0:
             tmp_obj['chem_vendors'] = cv
         tmp_obj[vendor_string] = []
 
-        if ikey in ikey_wd_map:
-            tmp_obj['qid'] = ikey_wd_map[ikey]
+        if primary_ikey in ikey_wd_map:
+            tmp_obj['qid'] = ikey_wd_map[primary_ikey]
 
         tmp_df = dt.loc[dt['uikey'] == uid]
         # if tmp_df.shape[0] > 1:
@@ -198,7 +231,7 @@ def generate_vendor_index(dt, vendor_string, doc_map):
                 if len(fp) > 0:
                     tmp_obj['fingerprint'] = fp
 
-                d_smiles, d_ikey, _ = desalt_compound(smiles)
+                d_smiles, d_ikey, _ = desalt_compound(smiles.split(' |')[0])
                 if len(d_smiles) > 1:
                     single_comp_dict['sub_smiles'] = d_smiles
                     single_comp_dict['sub_ikey'] = d_ikey
@@ -319,6 +352,7 @@ salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 compound_id_fp_map = {}
+no_charge_map = {}
 
 rfm_ikey_map = {x['public_id']: (x['ikey'], x['library'], x['source_id']) for x in
                 vendor_dt[['public_id', 'ikey', 'library', 'source_id']].to_dict(orient='records')}
@@ -472,7 +506,7 @@ generate_vendor_index(informa_dt, 'informa', informa_doc_map)
 #     if c % 100 == 0:
 #         print(c)
 
-
+#
 # for c, x in vendor_dt.iterrows():
 #     ikey = x['ikey']
 #     if pd.isnull(ikey):
@@ -510,7 +544,11 @@ for i in assay_data['ikey'].unique():
     if ikey in ikey_wd_map:
         tmp_obj['qid'] = ikey_wd_map[ikey]
 
-    _, tmp_obj['chem_vendors'] = get_rfm_ids(ikey)
+    rf, cv = get_rfm_ids(ikey)
+    if len(rf) > 0:
+        tmp_obj['reframe_id'] = rf
+    if len(cv) > 0:
+        tmp_obj['chem_vendors'] = cv
 
     if pd.isnull(ikey):
         continue

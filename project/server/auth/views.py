@@ -988,7 +988,7 @@ class SearchAPI(MethodView):
 
                 # make sure that Wikidata item gets used (labels, etc)
                 for c, y in enumerate(results):
-                    if y['id'] == compound_id:
+                    if y['id'] == compound_id and es.exists(index='reframe', doc_type='compound', id=y['id']):
                         results[c] = SearchAPI.retrieve_document(compound_id=compound_id, qid=qid)
 
             found = False
@@ -996,7 +996,7 @@ class SearchAPI(MethodView):
                 if y['id'] == compound_id:
                     found = True
 
-            if not found:
+            if not found and es.exists(index='reframe', doc_type='compound', id=compound_id):
                 results.append(SearchAPI.retrieve_document(compound_id=compound_id, qid=qid))
 
         return results

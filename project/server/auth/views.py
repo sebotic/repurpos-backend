@@ -307,12 +307,13 @@ class RegisterAPI(MethodView):
             }
             return make_response(jsonify(response_object)), 401
 
+        email = post_data.get('email').lower()
         # check if user already exists
-        user = User.query.filter_by(email=post_data.get('email')).first()
+        user = User.query.filter_by(email=email).first()
         if not user:
             try:
                 user = User(
-                    email=post_data.get('email'),
+                    email=email,
                     password=post_data.get('password')['password'],
                     confirmed=False
                 )
@@ -360,7 +361,7 @@ class LoginAPI(MethodView):
         try:
             # fetch the user data
             user = User.query.filter_by(
-                email=post_data.get('email')
+                email=post_data.get('email').lower()
             ).first()
             if user:
                 if bcrypt.check_password_hash(
@@ -492,6 +493,7 @@ class LogoutAPI(MethodView):
             }
             return make_response(jsonify(responseObject)), 403
 
+
 class confirmEmail(MethodView):
     """
     Confirm Email Resource
@@ -584,7 +586,7 @@ class resetPassword(MethodView):
     def post(self):
         post_data = request.get_json()
         try:
-            user = user = User.query.filter_by(id=post_data.get('user_id')).first()
+            user = user = User.query.filter_by(id=post_data.get('user_id').lower()).first()
             if user:
                 user.password = bcrypt.generate_password_hash(
                     post_data.get('password'), app.config.get('BCRYPT_LOG_ROUNDS')
@@ -654,10 +656,10 @@ class resetPasswordLink(MethodView):
     Create new reset password link
     """
     def post(self):
-        post_data = request.get_json();
+        post_data = request.get_json()
         try:
             user = User.query.filter_by(
-                email=post_data.get('email')
+                email=post_data.get('email').lower()
             ).first()
             if user:
                 if not user.confirmed:

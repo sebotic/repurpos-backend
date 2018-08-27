@@ -18,6 +18,7 @@ import requests
 import os
 import datetime
 import traceback
+import sys
 
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError
@@ -335,7 +336,7 @@ class RegisterAPI(MethodView):
                 }
                 return make_response(jsonify(responseObject)), 201
             except Exception as e:
-                traceback.print_exc()
+                traceback.print_exc(file=sys.stdout)
                 responseObject = {
                     'status': 'fail',
                     'message': 'Some error occurred. Please try again. ' + str(e)

@@ -335,6 +335,7 @@ class RegisterAPI(MethodView):
                 }
                 return make_response(jsonify(responseObject)), 201
             except Exception as e:
+                traceback.print_exc()
                 responseObject = {
                     'status': 'fail',
                     'message': 'Some error occurred. Please try again. ' + str(e)

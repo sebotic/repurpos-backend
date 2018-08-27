@@ -306,7 +306,7 @@ class RegisterAPI(MethodView):
                 'message': 'Some error occurred verifying ReCaptcha'
             }
             return make_response(jsonify(response_object)), 401
-
+        print(post_data)
         # check if user already exists
         user = User.query.filter_by(email=post_data.get('email')).first()
         if not user:

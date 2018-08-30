@@ -948,7 +948,7 @@ class SearchAPI(MethodView):
     @staticmethod
     def exec_freetext_search(search_term, indices=('reframe', 'wikidata')):
         body = {
-            "from": 0, "size": 100,
+            "from": 0, "size": 1000,
             "query": {
                 "query_string": {
                     "default_operator": "AND",

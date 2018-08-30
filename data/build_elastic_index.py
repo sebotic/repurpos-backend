@@ -557,6 +557,8 @@ for i in assay_data['ikey'].unique():
         continue
 
     for c, x in assay_data.loc[assay_data['ikey'] == i, :].iterrows():
+        if pd.notnull(x['smiles']):
+            tmp_obj['smiles'] = x['smiles']
 
         tt = {
             'assay_id': '',

@@ -298,15 +298,18 @@ assay_data_doc_map = {
     #'calibr_id': 'reframe_id',
     'ac50': 'ac50',
     'datamode': 'datamode',
-    'genedata_id': 'assay_id',
-    'assay_title': 'assay_title',
+    'id': 'assay_id',
+    'assay title': 'assay_title',
+    'efficacy': 'efficacy',
+    'rsquared': 'rsquared',
     # 'smiles': 'smiles',
     'ikey': 'ikey',
-    'PubChem CID': 'PubChem CID',
-    'pubchem_label': 'pubchem_label',
+    # 'PubChem CID': 'PubChem CID',
+    # 'pubchem_label': 'pubchem_label',
     'wikidata': 'wikidata',
-    'library': 'chem_vendor',
-    'source_id': 'chem_vendor_id'
+    # 'library': 'chem_vendor',
+    # 'source_id': 'chem_vendor_id'
+    'fixed_smiles': 'smiles'
 
 }
 
@@ -345,8 +348,8 @@ gvk_dt = pd.read_csv(os.path.join(data_dir, '20180430_GVK_excluded_column.csv'))
 integrity_dt = pd.read_csv(os.path.join(data_dir, 'integrity_annot_20180504.csv'))
 informa_dt = pd.read_csv(os.path.join(data_dir, '20180430_Informa_excluded_column.csv'))
 
-assay_descr = pd.read_csv(os.path.join(data_dir, '20180222_assay_descriptions.csv'), header=0)
-assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_w_vendor_mapping.csv'), header=0)
+assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20180827.csv'), header=0)
+assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20180703.csv'), header=0)
 vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot.csv'), sep=',')
 salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'))
 

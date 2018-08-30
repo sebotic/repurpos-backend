@@ -29,9 +29,9 @@ auth_blueprint = Blueprint('auth', __name__)
 
 data_dir = os.getenv('DATA_DIR')
 
-assay_descrip = pd.read_csv(os.path.join(data_dir, '20180222_assay_descriptions.csv'), header=0)
+assay_descrip = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20180827.csv'), header=0)
 
-plot_data = pd.read_csv(os.path.join(data_dir, '20180222_EC50_DATA_RFM_IDs_cpy.csv'), header=0)
+plot_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20180703.csv'), header=0)
 
 #
 # assay_data = pd.read_csv(data_dir + 'reframe_short_20170822.csv')
@@ -203,10 +203,10 @@ def get_assay_details(assay_id):
 def get_assay_list():
     assays = []
 
-    for idx, assay in assay_descrip.sort_values(['indication', 'assay_type', 'title']).iterrows():
+    for idx, assay in assay_descrip.sort_values(['indication', 'assay_type', 'assay_title']).iterrows():
         temp = {
             'assay_id': assay['assay_id'],
-            'title': assay['title'],
+            'title': assay['assay_title'],
             'indication': assay['indication'],
             'assay_type': assay['assay_type'],
             'summary':  assay['summary']
@@ -228,7 +228,7 @@ def get_dotplot_data(aid):
 
     def find_name(row):
         if pd.isnull(row.pubchem_label):
-            return row.ID
+            return row.ikey
         else:
             return row.pubchem_label
 
@@ -255,8 +255,8 @@ def get_dotplot_data(aid):
     # convert to the proper json-able structure
     for idx, cmpd in filtered.iterrows():
         temp = {
-            'assay_title': cmpd.assay_title,
-            'calibr_id': cmpd.calibr_id,
+            'assay_title': cmpd['assay title'],
+            'calibr_id': cmpd.ikey,
             'name': cmpd.main_label,
             'ac50': cmpd.ac50,
             'assay_type': cmpd.assay_type,

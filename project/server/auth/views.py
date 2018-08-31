@@ -830,12 +830,12 @@ class SearchAPI(MethodView):
         if qid and es.exists(index='wikidata', doc_type='compound', id=qid):
             wd_r = es.get(index='wikidata', doc_type='compound', id=qid)
             wd_data = wd_r['_source']
-            if 'en' in wd_data['labels']:
-                wd_main_label = wd_data['labels']['en']['value']
+            if 'label' in wd_data:
+                wd_main_label = wd_data['label']
 
             try:
-                if 'P2275' in wd_data['claims']:
-                    who_inn = wd_data['claims']['P2275'][0]['mainsnak']['datavalue']['value']['text']
+                if 'P2275' in wd_data:
+                    who_inn = wd_data['P2275'][0][0]
             except KeyError:
                 pass
 
@@ -988,7 +988,7 @@ class SearchAPI(MethodView):
             elif x['_index'] == 'wikidata':
                 qid = x['_id']
                 # get InChI key
-                compound_id = x['_source']['claims']['P235'][0]['mainsnak']['datavalue']['value']
+                compound_id = x['_source']['P235'][0]
 
                 # make sure that Wikidata item gets used (labels, etc)
                 for c, y in enumerate(results):

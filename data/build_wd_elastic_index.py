@@ -1,5 +1,6 @@
 import requests
-
+import pprint
+import wikidataintegrator as wdi
 from elasticsearch import Elasticsearch, client
 from elasticsearch.exceptions import RequestError
 es = Elasticsearch()
@@ -9,12 +10,33 @@ es = Elasticsearch()
 
 qid_list = []
 only_add_missing = True
+qid_label_map = {}
+
 
 def process_batch(batch):
     for count, hit in enumerate(batch['hits']['hits']):
         qid = hit['_source']['qid']
         if qid:
             qid_list.append(qid)
+
+
+def lookup_wd_item_label(qid):
+    if qid in qid_label_map:
+        return qid_label_map[qid]
+    else:
+        query = '''
+           SELECT ?compound ?label WHERE {{
+              VALUES ?compound  {{ wd:{} }}
+              ?compound rdfs:label ?label FILTER (LANG(?label) = "en") .
+            }}
+            '''.format(qid)
+
+        results = wdi.wdi_core.WDItemEngine.execute_sparql_query(query)
+        for x in results['results']['bindings']:
+            qid_label_map.update({x['compound']['value']: x['label']['value']})
+            return x['label']['value']
+
+        return qid
 
 
 body = {
@@ -50,13 +72,13 @@ while True:
 
 print(len(qid_list))
 
-bd = {
-    'mapping': {
-        'total_fields': {
-            'limit': 30000
-        }
-    }
-}
+# bd = {
+#     'mapping': {
+#         'total_fields': {
+#             'limit': 30000
+#         }
+#     }
+# }
 
 c = client.IndicesClient(es)
 # check if index exists, otherwise, create
@@ -66,39 +88,64 @@ if not only_add_missing:
 
     #     c.put_settings(index='wikidata', body=bd)
     # else:
-    c.create(index='wikidata', body=bd)
+    c.create(index='wikidata')
 
 session = requests.Session()
 
 for count, qid in enumerate(qid_list):
-
+    # print(qid)
     if only_add_missing:
         if es.exists(index='wikidata', doc_type='compound', id=qid):
             continue
 
-    header = {
-        'Accept': 'application/json'
-    }
+    condensed_wditem = {}
+    wditem = wdi.wdi_core.WDItemEngine(wd_item_id=qid)
 
-    r = session.get('http://www.wikidata.org/entity/{}'.format(qid), headers=header).json()
-    # print(r)
+    condensed_wditem['label'] = wditem.get_label('en') if wditem.get_label('en') else wditem.get_label('de')
+    condensed_wditem['aliases'] = wditem.get_aliases('en')
 
-    obj = r['entities'][qid]
-    del obj['descriptions']
+    exclude_props = ['P575', 'P117', 'P61', 'P1343', 'P373', 'P527', 'P508', 'P646', 'P227', 'P349', 'P1296', 'P3471',
+                     'P2669']
+    for x in wditem.original_statements:
+        prop_nr = x.get_prop_nr()
+        if prop_nr in exclude_props:
+            continue
+        value = x.get_value()
+        if type(x) == wdi.wdi_core.WDItemID and value:
+            value = lookup_wd_item_label('Q' + str(value))
 
-    for claim, value in obj['claims'].items():
-        # print(claim, value)
-        for x in value:
-            if 'references' in x:
-                del x['references']
+        if prop_nr in condensed_wditem and value:
+            condensed_wditem[prop_nr].append(value)
+        elif value:
+            condensed_wditem[prop_nr] = [value]
 
+        else:
+            continue
+
+    print(pprint.pprint(condensed_wditem))
+    # header = {
+    #     'Accept': 'application/json'
+    # }
+    #
+    # r = session.get('http://www.wikidata.org/entity/{}'.format(qid), headers=header).json()
+    # # print(r)
+    #
+    # obj = r['entities'][qid]
+    # del obj['descriptions']
+    #
+    # for claim, value in obj['claims'].items():
+    #     # print(claim, value)
+    #     for x in value:
+    #         if 'references' in x:
+    #             del x['references']
+    #
     if es.exists(index='wikidata', doc_type='compound', id=qid, request_timeout=30):
         # print('this exists!!')
-        es.update(index='wikidata', id=qid, doc_type='compound', body={'doc': obj}, request_timeout=30)
+        es.update(index='wikidata', id=qid, doc_type='compound', body={'doc': condensed_wditem}, request_timeout=30)
         # pass
     else:
         try:
-            res = es.index(index="wikidata", doc_type='compound', id=qid, body=obj, request_timeout=30)
+            res = es.index(index="wikidata", doc_type='compound', id=qid, body=condensed_wditem, request_timeout=30)
 
         except RequestError as e:
             print(e)
@@ -106,3 +153,7 @@ for count, qid in enumerate(qid_list):
     if count % 100 == 0:
         print('imported ', count)
 
+    #
+    # print(pprint.pprint(condensed_wditem))
+    # if count > 5:
+    #     break

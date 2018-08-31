@@ -122,23 +122,6 @@ for count, qid in enumerate(qid_list):
         else:
             continue
 
-    print(pprint.pprint(condensed_wditem))
-    # header = {
-    #     'Accept': 'application/json'
-    # }
-    #
-    # r = session.get('http://www.wikidata.org/entity/{}'.format(qid), headers=header).json()
-    # # print(r)
-    #
-    # obj = r['entities'][qid]
-    # del obj['descriptions']
-    #
-    # for claim, value in obj['claims'].items():
-    #     # print(claim, value)
-    #     for x in value:
-    #         if 'references' in x:
-    #             del x['references']
-    #
     if es.exists(index='wikidata', doc_type='compound', id=qid, request_timeout=30):
         # print('this exists!!')
         es.update(index='wikidata', id=qid, doc_type='compound', body={'doc': condensed_wditem}, request_timeout=30)
@@ -152,8 +135,3 @@ for count, qid in enumerate(qid_list):
 
     if count % 100 == 0:
         print('imported ', count)
-
-    #
-    # print(pprint.pprint(condensed_wditem))
-    # if count > 5:
-    #     break

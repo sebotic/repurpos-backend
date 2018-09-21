@@ -99,6 +99,11 @@ def add_to_no_charge_list(ikey):
         no_charge_map.update({sub_ikey: [ikey]})
 
 
+def to_ikey(smiles):
+    compound = Compound(compound_string=smiles, identifier_type='smiles')
+    return compound.get_inchi_key()
+
+
 def generate_unifiers(df, smiles_col, vendor_id_col):
     for c, x in df.iterrows():
         ikey = x['ikey']
@@ -116,9 +121,9 @@ def generate_unifiers(df, smiles_col, vendor_id_col):
                 continue
             else:
                 continue
-        no_split_metals = ['[Zn++]', '[Gd+3]', '[Al+3]', '[Fe+3]', '[Fe+2]', '[Zn++]', '[Zn+2]', '[Sr+2]', '[Sb+3]',
+        no_split_metals = ['[Zn++]', '[Gd+3]', '[Al+3]', '[Fe+3]', '[Fe+2]', '[Zn++]', '[Zn+2]', '[Sr+2]', 'Sb',
                            '[Pt+2]', '[H][Sr][H]', '[Pt++]', '[Cu++]', '[Fe]', '[Co+3]', '[Au+]', '[Ag+]', 'II',
-                           '[Mn++]', '[La+3]', '[IH-]', '[Ga+3]', '[Dy+3]', '[Cu+2]', '[Ce+]', 'O[Al++]',
+                           '[Mn++]', '[La+3]', '[IH-]', '[Ga+3]', '[Dy+3]', '[Cu+2]', 'Cu', '[Ce+]', 'O[Al++]',
                            'N[Pt++]N', 'Cl[Pt]Cl', 'Cl[Pt+]', 'CC[Hg+]', '[Li+]']
 
         d_smiles, d_ikey, d_masses = desalt_compound(smiles)
@@ -159,11 +164,23 @@ def generate_unifiers(df, smiles_col, vendor_id_col):
             with largest frequency.
             '''
             if abs(d_counts_mass[0][1] - d_counts_mass[1][1]) < 3:
-                df.loc[c, 'uikey'] = d_ikey_mass[0]
-                df.loc[c, 'usmiles'] = d_smiles_mass[0]
+                tmp_ikey = d_ikey_mass[0]
+                tmp_smiles = d_smiles_mass[0]
             else:
-                df.loc[c, 'uikey'] = d_ikey_freq[0]
-                df.loc[c, 'usmiles'] = d_smiles_freq[0]
+                tmp_ikey = d_ikey_freq[0]
+                tmp_smiles = d_smiles_freq[0]
+
+            plus_c = tmp_smiles.count('+')
+            minus_c = tmp_smiles.count('-')
+
+            if minus_c > plus_c:
+                tot = minus_c - plus_c
+
+                tmp_smiles = tmp_smiles + '.' + '.'.join(['[H+]'] * tot)
+                tmp_ikey = to_ikey(tmp_smiles)
+
+            df.loc[c, 'uikey'] = tmp_ikey
+            df.loc[c, 'usmiles'] = tmp_smiles
 
         else:
             df.loc[c, 'uikey'] = ikey

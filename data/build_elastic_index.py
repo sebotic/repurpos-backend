@@ -170,13 +170,15 @@ def generate_unifiers(df, smiles_col, vendor_id_col):
                 tmp_ikey = d_ikey_freq[0]
                 tmp_smiles = d_smiles_freq[0]
 
-            plus_c = tmp_smiles.count('+')
-            minus_c = tmp_smiles.count('-')
+            # tackle special case
+            if '[S@@+]' in tmp_smiles and '[O-]' in tmp_smiles:
+                tmp_smiles = tmp_smiles.replace('[S@@+]', '[S@@]')
+                tmp_smiles = tmp_smiles.replace('[O-]', '=O')
 
-            if minus_c > plus_c:
-                tot = minus_c - plus_c
+            repl = [('[O-]', '[OH]'), ('[N-]', '[NH]'), ('[n-]', '[nH]')]
 
-                tmp_smiles = tmp_smiles + '.' + '.'.join(['[H+]'] * tot)
+            for pattern, replacement in repl:
+                tmp_smiles = tmp_smiles.replace(pattern, replacement)
                 tmp_ikey = to_ikey(tmp_smiles)
 
             df.loc[c, 'uikey'] = tmp_ikey

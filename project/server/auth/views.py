@@ -264,7 +264,7 @@ def get_dotplot_data(aid):
             'r_sq': cmpd.rsquared,
             'pubchem_id': cmpd['PubChem CID'] if pd.notnull(cmpd['PubChem CID']) else '',
             'url': cmpd.url,
-            'refs_PMID': cmpd.refs_PMID
+
         }
 
         assay_data.append(temp)

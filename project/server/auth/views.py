@@ -29,7 +29,7 @@ auth_blueprint = Blueprint('auth', __name__)
 
 data_dir = os.getenv('DATA_DIR')
 
-assay_descrip = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20180827.csv'), header=0)
+assay_descrip = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20180827_pmid.csv'), header=0)
 
 plot_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20180703.csv'), header=0)
 
@@ -263,7 +263,8 @@ def get_dotplot_data(aid):
             'efficacy': cmpd.efficacy,
             'r_sq': cmpd.rsquared,
             'pubchem_id': cmpd['PubChem CID'] if pd.notnull(cmpd['PubChem CID']) else '',
-            'url': cmpd.url
+            'url': cmpd.url,
+            'refs_PMID': cmpd.refs_PMID
         }
 
         assay_data.append(temp)
@@ -1221,10 +1222,19 @@ class DataAPI(MethodView):
 
         print(auth_header)
         args = request.args
-        qid = args['qid']
-        # ikey = wd_ikey_map[qid]
-        ikey = qid
-        print(qid, ikey)
+
+        ikey = None
+        assay_id = None
+
+        if 'qid' in args:
+            ikey = args['qid']
+        elif 'assay' in args:
+            assay_id = args['assay']
+        else:
+            return make_response(jsonify({
+                'status': 'fail',
+                'message': 'Malformed query'
+            })), 500
 
         if auth_header:
             try:
@@ -1244,19 +1254,24 @@ class DataAPI(MethodView):
                 user = User.query.filter_by(id=resp).first()
                 if user.id:
                     try:
-                        res = es.get(index="reframe", doc_type='compound', id=ikey)
+
+                        if ikey:
+                            res = es.get(index="reframe", doc_type='compound', id=ikey)
+                            responseObject = {
+                                'status': 'success',
+                                ikey: res['_source']
+                            }
+
+                        elif assay_id:
+                            responseObject = get_dotplot_data(assay_id)
+
                     except Exception as e:
                         # if there is no Elasticsearch backend running, try to serve some example data.
-                        if qid in example_data:
-                            response_object = {qid: example_data[qid], "status": "success"}
+                        if ikey in example_data:
+                            response_object = {ikey: example_data[ikey], "status": "success"}
                             return make_response(jsonify(response_object)), 200
                         else:
                             return make_response(jsonify({'status': 'fail', 'ikeys': []})), 500
-
-                    responseObject = {
-                        'status': 'success',
-                        qid: res['_source']
-                    }
 
                     return make_response(jsonify(responseObject)), 200
 

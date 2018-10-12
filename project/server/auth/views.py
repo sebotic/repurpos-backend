@@ -5,7 +5,7 @@ from flask import Blueprint, request, make_response, jsonify, session, url_for, 
 from flask.views import MethodView
 
 from data.example_data import example_data
-from cdk_pywrapper.cdk_pywrapper import Compound
+from cdk_pywrapper.cdk_pywrapper import Compound, search_substructure
 
 from project.server import app, bcrypt, db
 from project.server.models import User, BlacklistToken
@@ -19,6 +19,7 @@ import os
 import datetime
 import traceback
 import sys
+import time
 
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError
@@ -51,6 +52,7 @@ plot_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20180703.csv'), heade
 # retrieve chemical fingerprints and store them in a list, also store the associated IDs in a list
 fingerprint_list = list()
 id_list = list()
+substr_list = list()
 
 
 def calculate_tanimoto(fp_1, fp_2):
@@ -61,20 +63,25 @@ def calculate_tanimoto(fp_1, fp_2):
 def process_batch(batch):
     for count, hit in enumerate(batch['hits']['hits']):
         compound_id = hit['_id']
-        id_list.append(compound_id)
-        fingerprint = set(hit['_source']['fingerprint'])
-        fingerprint_list.append(fingerprint)
+        if 'smiles' in hit['_source']:
+            smiles = hit['_source']['smiles']
+            substr_list.append((compound_id, smiles))
+
+        if 'fingerprint' in hit['_source']:
+            id_list.append(compound_id)
+            fingerprint = set(hit['_source']['fingerprint'])
+            fingerprint_list.append(fingerprint)
 
 
 body = {
     "_source": {
-        "includes": ["fingerprint"],
+        "includes": ["fingerprint", 'smiles'],
     },
     "query": {
         "query_string": {
 
             "query": "*",
-            "fields": ['fingerprint']
+            "fields": ['fingerprint', 'smiles']
         }
     },
     "sort": [
@@ -1093,6 +1100,29 @@ class SearchAPI(MethodView):
             responseObject = {
                 'status': 'success',
                 'results': results
+            }
+
+            return make_response(jsonify(responseObject)), 200
+
+        if search_type == 'substructure':
+            print('Total count of compound fingerprints:', len(fingerprint_list))
+
+            start = time.time()
+            subst_results = search_substructure(search_term, {k: v for k, v in substr_list})
+
+            end = time.time() - start
+
+            print(end)
+
+            found_cmpnds = []
+            for count, x in enumerate(subst_results):
+                search_result = SearchAPI.retrieve_document(x['id'])
+                search_result['svg'] = x['svg']
+                found_cmpnds.append(search_result)
+
+            responseObject = {
+                'status': 'success',
+                'results': found_cmpnds
             }
 
             return make_response(jsonify(responseObject)), 200

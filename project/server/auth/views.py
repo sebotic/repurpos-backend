@@ -25,6 +25,7 @@ from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError
 es = Elasticsearch()
 
+from urllib.parse import unquote
 
 auth_blueprint = Blueprint('auth', __name__)
 
@@ -1020,7 +1021,7 @@ class SearchAPI(MethodView):
         print(auth_header)
         args = request.args
         # TODO: add input checks here
-        search_term = args['query']
+        search_term = unquote(args['query'])
         search_type = args['type']
 
         search_mode = ''
@@ -1172,7 +1173,7 @@ class MolfileAPI(MethodView):
 
     def get(self):
         args = request.args
-        compound_structure = args['compound_structure']
+        compound_structure = unquote(args['compound_structure'])
 
         try:
             compound = Compound(compound_string=compound_structure, identifier_type='smiles')
@@ -1204,7 +1205,7 @@ class CompoundSVGAPI(MethodView):
 
     def get(self):
         args = request.args
-        compound_structure = args['structure']
+        compound_structure = unquote(args['structure'])
 
         if 'format' in args and args['format'] == 'inchikey':
             search_results = SearchAPI.exec_freetext_search(compound_structure, indices=('reframe'))

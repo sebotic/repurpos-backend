@@ -31,9 +31,9 @@ auth_blueprint = Blueprint('auth', __name__)
 
 data_dir = os.getenv('DATA_DIR')
 
-assay_descrip = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20180827_pmid.csv'), header=0, index_col=False)
+assay_descrip = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20190104.csv'), header=0, index_col=False)
 
-plot_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20180703.csv'), header=0)
+plot_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20190104.csv'), header=0)
 
 #
 # assay_data = pd.read_csv(data_dir + 'reframe_short_20170822.csv')
@@ -242,7 +242,7 @@ def get_dotplot_data(aid):
 
     assay_data = []
     # filter out data: selected assay, valid AC50 value
-    filtered = plot_data.copy()[(plot_data['id'] == aid) & (plot_data['ac50'])]
+    filtered = plot_data.copy()[(plot_data['assay_id'] == aid) & (plot_data['ac50'])]
 
     filtered['assay_type'] = filtered.datamode.apply(find_type)
     filtered = filtered.loc[filtered['assay_type'] != 'unknown'] # remove weird data modes

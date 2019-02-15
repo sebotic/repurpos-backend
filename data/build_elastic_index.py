@@ -121,6 +121,8 @@ def generate_unifiers(df, smiles_col, vendor_id_col):
                 continue
             else:
                 continue
+
+        # List of metals, if contained in a SMILES, the SMILES should not be split
         no_split_metals = ['[Zn++]', '[Gd+3]', '[Al+3]', '[Fe+3]', '[Fe+2]', '[Zn++]', '[Zn+2]', '[Sr+2]', 'Sb',
                            '[Pt+2]', '[H][Sr][H]', '[Pt++]', '[Cu++]', '[Fe]', '[Co+3]', '[Au+]', '[Ag+]', 'II',
                            '[Mn++]', '[La+3]', '[IH-]', '[Ga+3]', '[Dy+3]', '[Cu+2]', 'Cu', '[Ce+]', 'O[Al++]',
@@ -316,9 +318,10 @@ informa_doc_map = {
 assay_data_doc_map = {
     #'calibr_id': 'reframe_id',
     'ac50': 'ac50',
+    'ac_precision': 'ac_precision',
     'datamode': 'datamode',
-    'id': 'assay_id',
-    'assay title': 'assay_title',
+    'assay_id': 'assay_id',
+#    'assay title': 'assay_title',
     'efficacy': 'efficacy',
     'rsquared': 'rsquared',
     # 'smiles': 'smiles',
@@ -367,8 +370,8 @@ gvk_dt = pd.read_csv(os.path.join(data_dir, '20180430_GVK_excluded_column.csv'))
 integrity_dt = pd.read_csv(os.path.join(data_dir, 'integrity_annot_20180504.csv'))
 informa_dt = pd.read_csv(os.path.join(data_dir, '20180430_Informa_excluded_column.csv'))
 
-assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20180827.csv'), header=0)
-assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20180703.csv'), header=0)
+assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20190104.csv'), header=0)
+assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20190104.csv'), header=0)
 vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot.csv'), sep=',')
 salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'))
 
@@ -602,6 +605,17 @@ for i in assay_data['ikey'].unique():
 
                 continue
 
+            if k == 'ac_precision':
+                precision = x['ac_precision']
+                if precision == 'equal':
+                    tt.update({'ac_precision': ''})
+                elif precision == 'greater than':
+                    tt.update({'ac_precision': '>'})
+                elif precision == 'less than':
+                    tt.update({'ac_precision': '<'})
+
+                continue
+
             tt.update({v: x[k]})
 
             # add indication and short assay title from assay descriptions
@@ -609,6 +623,7 @@ for i in assay_data['ikey'].unique():
                 aid = tt['assay_id']
                 for cc, ad in assay_descr.iterrows():
                     if aid == ad['assay_id']:
+                        tt['assay_title'] = ad['assay_title']
                         tt['title_short'] = ad['title_short']
                         tt['indication'] = ad['indication']
 

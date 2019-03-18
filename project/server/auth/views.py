@@ -263,7 +263,7 @@ def get_dotplot_data(aid):
     # convert to the proper json-able structure
     for idx, cmpd in filtered.iterrows():
         temp = {
-            'assay_title': cmpd['assay title'],
+            'assay_title': cmpd['assay_title'],
             'calibr_id': cmpd.ikey,
             'name': cmpd.main_label,
             'ac50': cmpd.ac50,

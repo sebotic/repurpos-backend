@@ -232,6 +232,13 @@ def generate_vendor_index(dt, vendor_string, doc_map):
                 elif 'smiles' not in tmp_obj or not tmp_obj['smiles']:
                     tmp_obj['smiles'] = x['usmiles']
 
+                    try:
+                        compound = Compound(compound_string=x['usmiles'], identifier_type='smiles')
+                        tmp_obj['chirality'] = compound.get_chirality()
+                    except Exception as e:
+                        print('Determining chirality failed for', ikey, x['usmiles'])
+
+
             single_comp_dict = {}
             for k, v in doc_map.items():
                 if pd.isnull(x[k]) or v is None:

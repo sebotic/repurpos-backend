@@ -31,9 +31,9 @@ auth_blueprint = Blueprint('auth', __name__)
 
 data_dir = os.getenv('DATA_DIR')
 
-assay_descrip = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20190104.csv'), header=0, index_col=False)
+assay_descrip = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20190331.csv'), header=0, index_col=False)
 
-plot_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20190104.csv'), header=0)
+plot_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20190331.csv'), header=0)
 
 #
 # assay_data = pd.read_csv(data_dir + 'reframe_short_20170822.csv')

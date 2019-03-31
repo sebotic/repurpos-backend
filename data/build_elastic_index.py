@@ -377,9 +377,9 @@ gvk_dt = pd.read_csv(os.path.join(data_dir, '20180430_GVK_excluded_column.csv'))
 integrity_dt = pd.read_csv(os.path.join(data_dir, 'integrity_annot_20180504.csv'))
 informa_dt = pd.read_csv(os.path.join(data_dir, '20180430_Informa_excluded_column.csv'))
 
-assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20190104.csv'), header=0)
-assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20190104.csv'), header=0)
-vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot.csv'), sep=',')
+assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20190331.csv'), header=0)
+assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20190331.csv'), header=0)
+vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot_2019-03-31.csv'), sep=',')
 salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'))
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')

@@ -301,8 +301,8 @@ integrity_doc_map = {
     'int_MoA': ('mechanism', '; '),
     # 'calibr_note': None,
     'ikey': 'ikey',
-    'wikidata': 'wikidata',
-    'PubChem CID': 'PubChem CID'
+    #'wikidata': 'wikidata',
+    #'PubChem CID': 'PubChem CID'
 }
 
 informa_doc_map = {
@@ -373,12 +373,12 @@ basic_block = {
 
 data_dir = os.getenv('DATA_DIR')
 # assay_data = pd.read_csv(os.path.join(data_dir, 'reframe_short_20170822.csv'))
-gvk_dt = pd.read_csv(os.path.join(data_dir, '20180430_GVK_excluded_column.csv'))
-integrity_dt = pd.read_csv(os.path.join(data_dir, 'integrity_annot_20180504.csv'))
+gvk_dt = pd.read_csv(os.path.join(data_dir, '2019-04-15_gvk_annotations.csv'))
+integrity_dt = pd.read_csv(os.path.join(data_dir, '2019-04-15_integrity_annotations.csv'))
 informa_dt = pd.read_csv(os.path.join(data_dir, '20180430_Informa_excluded_column.csv'))
 
-assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20190331.csv'), header=0)
-assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20190331.csv'), header=0)
+assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20190415.csv'), header=0)
+assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20190415.csv'), header=0)
 vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot_2019-03-31.csv'), sep=',')
 salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'))
 

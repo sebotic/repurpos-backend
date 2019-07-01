@@ -315,10 +315,10 @@ informa_doc_map = {
     'origin': 'origin',
     'chem_name': 'chemical_name',
     'smiles': 'smiles',
-    'key': None,
+    # 'key': None,
     'ikey': 'ikey',
-    'pubchem': 'PubChem CID',
-    'wikidata': 'wikidata',
+    # 'pubchem': 'PubChem CID',
+    # 'wikidata': 'wikidata',
     'informa_id': 'informa_id'
 }
 
@@ -373,9 +373,9 @@ basic_block = {
 
 data_dir = os.getenv('DATA_DIR')
 # assay_data = pd.read_csv(os.path.join(data_dir, 'reframe_short_20170822.csv'))
-gvk_dt = pd.read_csv(os.path.join(data_dir, '2019-04-15_gvk_annotations.csv'))
+gvk_dt = pd.read_csv(os.path.join(data_dir, '2019-06-24_gvk_annotations.csv'))
 integrity_dt = pd.read_csv(os.path.join(data_dir, '2019-04-15_integrity_annotations.csv'))
-informa_dt = pd.read_csv(os.path.join(data_dir, '20180430_Informa_excluded_column.csv'))
+informa_dt = pd.read_csv(os.path.join(data_dir, '2019-05-30_informa_annotations.csv'))
 
 assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20190415.csv'), header=0)
 assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20190415.csv'), header=0)

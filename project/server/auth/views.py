@@ -248,8 +248,8 @@ def get_dotplot_data(aid):
     filtered = filtered.loc[filtered['assay_type'] != 'unknown'] # remove weird data modes
 
     filtered['url'] = filtered[['ikey', 'wikidata']].apply(
-        lambda x: '/#/compound_data/{}'.format(x['ikey'])
-        if pd.isnull(x['wikidata']) else '/#/compound_data/{};qid={}'.format(x['ikey'], x['wikidata']), axis=1)
+        lambda x: '/compound_data/{}'.format(x['ikey'])
+        if pd.isnull(x['wikidata']) else '/compound_data/{};qid={}'.format(x['ikey'], x['wikidata']), axis=1)
 
     filtered['main_label'] = filtered.apply(find_name, axis=1)
 
@@ -332,7 +332,7 @@ class RegisterAPI(MethodView):
 
                 # generate email confirmation token
                 token = generate_confirmation_token(user.email)
-                confirm_url = app.config.get('FRONTEND_URL') + '#/confirm/' + token # url_for('auth.confirm_email', token=token, _external=True)
+                confirm_url = app.config.get('FRONTEND_URL') + '/confirm/' + token # url_for('auth.confirm_email', token=token, _external=True)
                 html = render_template('activate.html', confirm_url=confirm_url)
                 subject = "ReframeDB: Please confirm your email"
                 send_email(user.email, subject, html)
@@ -555,7 +555,7 @@ class confirmEmailLink(MethodView):
                 if not user.confirmed:
                     # generate email confirmation token
                     token = generate_confirmation_token(user.email)
-                    confirm_url = app.config.get('FRONTEND_URL') + '#/confirm/' + token # url_for('auth.confirm_email', token=token, _external=True)
+                    confirm_url = app.config.get('FRONTEND_URL') + '/confirm/' + token # url_for('auth.confirm_email', token=token, _external=True)
                     html = render_template('activate.html', confirm_url=confirm_url)
                     subject = "ReframeDB: Please confirm your email"
                     send_email(user.email, subject, html)
@@ -681,7 +681,7 @@ class resetPasswordLink(MethodView):
                 else:
                     # generate email confirmation token
                     token = generate_confirmation_token(user.email)
-                    reset_pass_url = app.config.get('FRONTEND_URL') + '#/reset_pass/' + token # url_for('auth.confirm_email', token=token, _external=True)
+                    reset_pass_url = app.config.get('FRONTEND_URL') + '/reset_pass/' + token # url_for('auth.confirm_email', token=token, _external=True)
                     html = render_template('password.html', reset_pass_url=reset_pass_url)
                     subject = "ReframeDB: Reset your password"
                     send_email(user.email, subject, html)

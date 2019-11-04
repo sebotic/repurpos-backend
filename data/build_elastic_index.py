@@ -377,8 +377,8 @@ gvk_dt = pd.read_csv(os.path.join(data_dir, '2019-06-24_gvk_annotations.csv'))
 integrity_dt = pd.read_csv(os.path.join(data_dir, '2019-04-15_integrity_annotations.csv'))
 informa_dt = pd.read_csv(os.path.join(data_dir, '2019-05-30_informa_annotations.csv'))
 
-assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20191101.csv'), header=0)
-assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20191101.csv'), header=0)
+assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20191104.csv'), header=0)
+assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20191104.csv'), header=0)
 vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot_2019-03-31.csv'), sep=',')
 salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'))
 

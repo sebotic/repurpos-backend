@@ -379,7 +379,7 @@ informa_dt = pd.read_csv(os.path.join(data_dir, '2019-05-30_informa_annotations.
 
 assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20191104.csv'), header=0)
 assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20191104.csv'), header=0)
-vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot_2019-03-31.csv'), sep=',')
+vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot_2019-11-07.csv'), sep=',')
 salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'))
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')

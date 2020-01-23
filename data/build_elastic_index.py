@@ -590,7 +590,7 @@ for i in assay_data['ikey'].unique():
             tmp_obj['smiles'] = x['smiles']
 
             # when there is no vendor annotation data, make sure there's still a fingerprint
-            if 'fingerprint' in tmp_obj and len(tmp_obj['fingerprint']) > 0:
+            if not ('fingerprint' in tmp_obj and len(tmp_obj['fingerprint']) > 0):
                 fp = generate_fingerprint(x['smiles'], ikey, x['smiles'], tmp_obj['qid'])
                 if len(fp) > 0:
                     tmp_obj['fingerprint'] = fp

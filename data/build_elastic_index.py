@@ -15,8 +15,12 @@ es = Elasticsearch()
 
 def generate_fingerprint(smiles, compound_id, main_label, qid):
     if smiles:
-        compound = Compound(compound_string=smiles, identifier_type='smiles', suppress_hydrogens=True)
-        fingerprint = compound.get_bitmap_fingerprint()
+        try:
+            compound = Compound(compound_string=smiles, identifier_type='smiles', suppress_hydrogens=True)
+            fingerprint = compound.get_bitmap_fingerprint()
+        except ValueError as e:
+            print(e)
+            return []
         fp = {x for x in str(fingerprint)[1:-1].split(', ')}
 
         # if only compound id is set as a label, try to set something more useful

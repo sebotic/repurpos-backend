@@ -19,6 +19,7 @@ def generate_fingerprint(smiles, compound_id, main_label, qid):
             compound = Compound(compound_string=smiles, identifier_type='smiles', suppress_hydrogens=True)
             fingerprint = compound.get_bitmap_fingerprint()
         except ValueError as e:
+            print('Failed for', smiles, compound_id, main_label, qid)
             print(e)
             return []
         fp = {x for x in str(fingerprint)[1:-1].split(', ')}
@@ -590,12 +591,13 @@ for i in assay_data['ikey'].unique():
         continue
 
     for c, x in assay_data.loc[assay_data['ikey'] == i, :].iterrows():
-        if pd.notnull(x['smiles']):
-            tmp_obj['smiles'] = x['smiles']
+        # important to use smiles with fixed kekule structure
+        if pd.notnull(x['fixed_smiles']):
+            tmp_obj['smiles'] = x['fixed_smiles']
 
             # when there is no vendor annotation data, make sure there's still a fingerprint
             if not ('fingerprint' in tmp_obj and len(tmp_obj['fingerprint']) > 0):
-                fp = generate_fingerprint(x['smiles'], ikey, x['smiles'], tmp_obj['qid'])
+                fp = generate_fingerprint(x['smiles'], ikey, x['fixed_smiles'], tmp_obj['qid'])
                 if len(fp) > 0:
                     tmp_obj['fingerprint'] = fp
 

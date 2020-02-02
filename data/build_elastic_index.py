@@ -612,7 +612,7 @@ for i in assay_data['ikey'].unique():
                 continue
 
             if k == 'datamode':
-                datamode = x['datamode']
+                datamode = x['datamode'].upper()
                 if datamode not in ['DECREASING', 'INCREASING', 'SUPER_ACTIVE']:
                     continue
                 elif datamode == 'DECREASING':

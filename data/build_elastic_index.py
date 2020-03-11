@@ -109,6 +109,29 @@ def to_ikey(smiles):
     return compound.get_inchi_key()
 
 
+def get_qid(annotations):
+    annot_qid_lst = []
+    for a in annotations:
+        if a in annotation_mappings['annotation string (original)'].values:
+            qids = annotation_mappings.loc[annotation_mappings['annotation string (original)'] == a, 'WD item'].values[0]
+            #split_labels = annotation_mappings.loc[annotation_mappings['annotation_string_split'] == a, 'WD item'].values[0]
+            # annot_qid_lst.append({
+            #     'label': split_labels.split('|') if pd.notnull(split_labels) else [a],
+            #     'wikidata': [] if pd.isnull(qids) else qids.split('|')
+            # })
+            annot_qid_lst.append({
+                'label': a,
+                'wikidata': qids if pd.notnull(qids) else ''
+            })
+        else:
+            annot_qid_lst.append({
+                'label': a,
+                'wikidata': ''
+            })
+
+    return annot_qid_lst
+
+
 def generate_unifiers(df, smiles_col, vendor_id_col):
     for c, x in df.iterrows():
         ikey = x['ikey']
@@ -243,13 +266,15 @@ def generate_vendor_index(dt, vendor_string, doc_map):
                     except Exception as e:
                         print('Determining chirality failed for', ikey, x['usmiles'])
 
-
             single_comp_dict = {}
             for k, v in doc_map.items():
                 if pd.isnull(x[k]) or v is None:
                     continue
                 if type(v) == tuple:
-                    single_comp_dict.update({v[0]: x[k].split(v[1])})
+                    if len(v) == 2:
+                        single_comp_dict.update({v[0]: x[k].split(v[1])})
+                    elif len(v) == 3:
+                        single_comp_dict.update({v[0]: get_qid(x[k].split(v[1]))})
 
                 else:
                     single_comp_dict.update({v: x[k]})
@@ -271,6 +296,9 @@ def generate_vendor_index(dt, vendor_string, doc_map):
 
             tmp_obj[vendor_string].append(single_comp_dict)
 
+        if counter < 4:
+            pprint.pprint(tmp_obj)
+
         update_es(tmp_obj)
 
         # pprint.pprint(tmp_obj)
@@ -283,6 +311,13 @@ def generate_vendor_index(dt, vendor_string, doc_map):
 
 # index name 'reframe'
 
+
+"""
+The following three maps map vendor data column names to ES document json keys. When there is a tuple in the map, the 
+strings from the vendor data need to be split. Element one in the tuple represents the ES document json key name, 
+element two the split character. Element three, if present, indicates that each of the strings needs to be mapped to 
+a Wikidata QID.
+"""
 gvk_doc_map = {
     # 'hvac_id': 'hvac_id',
     'gvk_id': 'gvk_id',
@@ -290,8 +325,8 @@ gvk_doc_map = {
     'drug_name': ('drug_name', '; '),
     'phase': ('phase', '; '),
     'drug_roa': ('roa', '; '),
-    'category': ('category', '; '),
-    'mechanism': ('mechanism', '; '),
+    'category': ('category', '; ', True),
+    'mechanism': ('mechanism', '; ', True),
     'sub_smiles': 'smiles',
     'synonyms':	('synonyms', '; '),
     'ikey': 'ikey'
@@ -302,8 +337,8 @@ integrity_doc_map = {
     'smiles': 'smiles',
     'name': ('drug_name', '; '),
     'status': ('phase', '; '),
-    'int_thera_group': ('category', '; '),
-    'int_MoA': ('mechanism', '; '),
+    'int_thera_group': ('category', '; ', True),
+    'int_MoA': ('mechanism', '; ', True),
     # 'calibr_note': None,
     'ikey': 'ikey',
     #'wikidata': 'wikidata',
@@ -314,9 +349,9 @@ informa_doc_map = {
     'name': ('drug_name', '\n'),
     # 'Global Status': ('phase', '; '),
     'highest_status (between global and Highest Status)': 'highest_phase',
-    'moa': ('mechanism', '\n'),
-    'target_name': ('target_name', '\n'),
-    'target_family': ('target_families', '\n'),
+    'moa': ('mechanism', '\n', True),
+    'target_name': ('target_name', '\n', True),
+    'target_family': ('target_families', '\n', True),
     'origin': 'origin',
     'chem_name': 'chemical_name',
     'smiles': 'smiles',
@@ -381,10 +416,11 @@ data_dir = os.getenv('DATA_DIR')
 gvk_dt = pd.read_csv(os.path.join(data_dir, '2019-06-24_gvk_annotations.csv'))
 integrity_dt = pd.read_csv(os.path.join(data_dir, '2019-04-15_integrity_annotations.csv'))
 informa_dt = pd.read_csv(os.path.join(data_dir, '2019-05-30_informa_annotations.csv'))
+annotation_mappings = pd.read_csv(os.path.join(data_dir, 'reframe_annotations_mapping_20200211.csv'))
 
 assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20191104.csv'), header=0)
-assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200120.csv'), header=0)
-vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot_2019-11-07.csv'), sep=',')
+assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200229.csv'), header=0)
+vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot_2020-02-29.csv'), sep=',')
 salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'))
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')

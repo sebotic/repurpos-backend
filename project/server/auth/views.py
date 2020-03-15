@@ -240,42 +240,94 @@ def get_dotplot_data(aid):
         else:
             return row.pubchem_label
 
-    assay_data = []
-    # filter out data: selected assay, valid AC50 value
-    filtered = plot_data.copy()[(plot_data['assay_id'] == aid) & (plot_data['ac50'])]
+    body = {
+        "from": 0, "size": 2000,
+        "query": {
+            "query_string": {
+                "default_operator": "AND",
 
-    filtered['assay_type'] = filtered.datamode.apply(find_type)
-    filtered = filtered.loc[filtered['assay_type'] != 'unknown'] # remove weird data modes
-
-    filtered['url'] = filtered[['ikey', 'wikidata']].apply(
-        lambda x: '/compound_data/{}'.format(x['ikey'])
-        if pd.isnull(x['wikidata']) else '/compound_data/{};qid={}'.format(x['ikey'], x['wikidata']), axis=1)
-
-    filtered['main_label'] = filtered.apply(find_name, axis=1)
-
-    # group by unique ID and nest.
-    # fncns = ['count', 'min', 'max', 'mean']
-    # filtered = filtered.groupby(['ID']).agg(fncns)
-
-    # sort values
-    filtered = filtered.sort_values('ac50')
-
-    # convert to the proper json-able structure
-    for idx, cmpd in filtered.iterrows():
-        temp = {
-            'assay_title': cmpd['assay_title'],
-            'calibr_id': cmpd.ikey,
-            'name': cmpd.main_label,
-            'ac50': cmpd.ac50,
-            'assay_type': cmpd.assay_type,
-            'efficacy': cmpd.efficacy,
-            'r_sq': cmpd.rsquared,
-            'pubchem_id': cmpd['PubChem CID'] if pd.notnull(cmpd['PubChem CID']) else '',
-            'url': cmpd.url,
-
+                "query": aid
+            }
         }
+    }
+    print(aid)
+    try:
+        res = es.search(index='reframe', body=body)
+        print(res)
+    except Exception as e:
 
-        assay_data.append(temp)
+        print(aid)
+        print(e)
+        raise e
+
+    assay_data = []
+    for z in res['hits']['hits']:
+        x = z['_source']
+        compound_id = z['_id']
+        compound_name = ''
+        for vendor in ['integrity', 'gvk', 'informa']:
+            if compound_name and compound_name != z['_id']:
+                continue
+            elif vendor in x and len(x[vendor]) > 0 and x[vendor][0]['drug_name'][0]:
+                compound_name = x[vendor][0]['drug_name'][0]
+            else:
+                compound_name = z['_id']
+
+        for a in x['assay']:
+            if a['assay_id'] != aid:
+                continue
+
+            temp = {
+                'assay_title': a['assay_title'],
+                'calibr_id': z['_id'],
+                'name': compound_name,
+                'ac50': a['ac50'],
+                'assay_type': a['activity_type'],
+                'efficacy': a['efficacy'],
+                'r_sq': a['rsquared'],
+                'pubchem_id': '',
+                'url': '/compound_data/{}'.format(z['_id']) if not x['qid'] else '/compound_data/{};qid={}'.format(z['_id'], x['qid'])
+
+            }
+            assay_data.append(temp)
+    print(assay_data)
+
+    # assay_data = []
+    # # filter out data: selected assay, valid AC50 value
+    # filtered = plot_data.copy()[(plot_data['assay_id'] == aid) & (plot_data['ac50'])]
+    #
+    # filtered['assay_type'] = filtered.datamode.apply(find_type)
+    # filtered = filtered.loc[filtered['assay_type'] != 'unknown'] # remove weird data modes
+    #
+    # filtered['url'] = filtered[['ikey', 'wikidata']].apply(
+    #     lambda x: '/compound_data/{}'.format(x['ikey'])
+    #     if pd.isnull(x['wikidata']) else '/compound_data/{};qid={}'.format(x['ikey'], x['wikidata']), axis=1)
+    #
+    # filtered['main_label'] = filtered.apply(find_name, axis=1)
+    #
+    # # group by unique ID and nest.
+    # # fncns = ['count', 'min', 'max', 'mean']
+    # # filtered = filtered.groupby(['ID']).agg(fncns)
+    #
+    # # sort values
+    # filtered = filtered.sort_values('ac50')
+    #
+    # # convert to the proper json-able structure
+    # for idx, cmpd in filtered.iterrows():
+    #     temp = {
+    #         'assay_title': cmpd['assay_title'],
+    #         'calibr_id': cmpd.ikey,
+    #         'name': cmpd.main_label,
+    #         'ac50': cmpd.ac50,
+    #         'assay_type': cmpd.assay_type,
+    #         'efficacy': cmpd.efficacy,
+    #         'r_sq': cmpd.rsquared,
+    #         'pubchem_id': cmpd['PubChem CID'] if pd.notnull(cmpd['PubChem CID']) else '',
+    #         'url': cmpd.url,
+    #
+    #     }
+    #
+    #     assay_data.append(temp)
 
     return assay_data
 
@@ -595,7 +647,7 @@ class resetPassword(MethodView):
     def post(self):
         post_data = request.get_json()
         try:
-            user = user = User.query.filter_by(id=post_data.get('user_id').lower()).first()
+            user = User.query.filter_by(id=post_data.get('user_id')).first()
             if user:
                 user.password = bcrypt.generate_password_hash(
                     post_data.get('password'), app.config.get('BCRYPT_LOG_ROUNDS')
@@ -1297,6 +1349,7 @@ class DataAPI(MethodView):
                             responseObject = get_dotplot_data(assay_id)
 
                     except Exception as e:
+                        print(e)
                         # if there is no Elasticsearch backend running, try to serve some example data.
                         if ikey in example_data:
                             response_object = {ikey: example_data[ikey], "status": "success"}

@@ -686,6 +686,46 @@ for i in assay_data['ikey'].unique():
 
     update_es(tmp_obj)
 
+print('adding stereofree matches ...')
+stereofree_list = [x[:15] for x in compound_id_fp_map.keys() if pd.notnull(x) and len(x) > 15]
+for i in vendor_dt['ikey'].unique():
+    if es.exists(index='reframe', doc_type='compound', id=i):
+        continue
+
+    if pd.isnull(i) or (pd.notnull(i) and i[:15] not in stereofree_list):
+        continue
+
+    tmp_obj = copy.deepcopy(reframe_doc)
+    tmp_obj['ikey'] = i
+    ikey = i
+    print(i)
+
+    if ikey in ikey_wd_map:
+        tmp_obj['qid'] = ikey_wd_map[ikey]
+
+    rf, cv = get_rfm_ids(ikey)
+    if len(rf) > 0:
+        tmp_obj['reframe_id'] = rf
+    if len(cv) > 0:
+        tmp_obj['chem_vendors'] = cv
+
+    if pd.isnull(ikey):
+        continue
+
+    for c, x in vendor_dt.loc[vendor_dt['ikey'] == i, :].iterrows():
+
+        if pd.notnull(x['fixed_smiles']):
+            tmp_obj['smiles'] = x['fixed_smiles']
+
+            # when there is no vendor annotation data, make sure there's still a fingerprint
+            if not ('fingerprint' in tmp_obj and len(tmp_obj['fingerprint']) > 0):
+                fp = generate_fingerprint(x['smiles'], ikey, x['fixed_smiles'], tmp_obj['qid'])
+                if len(fp) > 0:
+                    tmp_obj['fingerprint'] = fp
+
+    update_es(tmp_obj)
+
+
 for c, (compound_id, values) in enumerate(compound_id_fp_map.items()):
     _, main_label, qid, fp = values
 
@@ -695,7 +735,7 @@ for c, (compound_id, values) in enumerate(compound_id_fp_map.items()):
             continue
 
         tnmt = calculate_tanimoto(fp, r_fp)
-        if tnmt > 0.85:
+        if tnmt > 0.82:
             search_result = {'compound_id': r_id, 'qid': r_qid, 'score': tnmt, 'main_label': r_label}
             found_cmpnds.append(search_result)
 

@@ -30,7 +30,7 @@ def generate_fingerprint(smiles, compound_id, main_label, qid):
             if sim_item[1] == compound_id:
                 sim_item[1] = main_label
         else:
-            compound_id_fp_map.update({compound_id: (compound_id, main_label, qid, fp)})
+            compound_id_fp_map.update({compound_id: [compound_id, main_label, qid, fp]})
 
         return list(fp)
     else:
@@ -80,15 +80,28 @@ def desalt_compound(smiles):
 def get_rfm_ids(ikey):
     rfm_ids = []
     chem_vendors = []
+    match_types = []
 
-    for k, v in rfm_ikey_map.items():
-        s_id, s_vendor, s_vendor_id = v
-        if s_id == ikey:
-            rfm_ids.append(True)
-            chem_vendors.append({'chem_vendor': s_vendor if pd.notnull(s_vendor) else '',
-                                 'chem_vendor_id': s_vendor_id if pd.notnull(s_vendor_id) else ''})
+    if ikey not in vendor_dt.ikey.values:
+        return rfm_ids, chem_vendors, match_types
 
-    return rfm_ids, chem_vendors
+    tdf = vendor_dt.loc[vendor_dt.ikey == ikey, :]
+    rfm_ids = list(tdf.public_id.values)
+    chem_vendors = [{'chem_vendor': x['library'] if pd.notnull(x['library']) else '',
+                     'chem_vendor_id': x['source_id'] if pd.notnull(x['source_id']) else ''}
+                    for x in tdf[['library', 'source_id']].to_dict('records')]
+    match_types = list(tdf.rfm_match_type.values)
+
+    # for k, v in rfm_ikey_map.items():
+    #     s_id, s_vendor, s_vendor_id, s_match_type = v
+    #     if s_id == ikey:
+    #         rfm_ids.append(True)
+    #         chem_vendors.append({'chem_vendor': s_vendor if pd.notnull(s_vendor) else '',
+    #                              'chem_vendor_id': s_vendor_id if pd.notnull(s_vendor_id) else ''})
+    #
+    #         match_types.append(s_match_type)
+
+    return rfm_ids, chem_vendors, match_types
 
 
 def calculate_tanimoto(fp_1, fp_2):
@@ -235,15 +248,19 @@ def generate_vendor_index(dt, vendor_string, doc_map):
 
         tmp_obj = copy.deepcopy(reframe_doc)
         tmp_obj['ikey'] = primary_ikey
-        rf, cv = get_rfm_ids(primary_ikey)
+        rf, cv, mt = get_rfm_ids(primary_ikey)
         if len(rf) > 0:
-            tmp_obj['reframe_id'] = rf
+            tmp_obj['reframe_id'] = mt
         if len(cv) > 0:
             tmp_obj['chem_vendors'] = cv
         tmp_obj[vendor_string] = []
 
         if primary_ikey in ikey_wd_map:
             tmp_obj['qid'] = ikey_wd_map[primary_ikey]
+
+        if primary_ikey in ikey_main_label_map:
+            tmp_obj['main_label'] = ikey_main_label_map[primary_ikey] \
+                if pd.notnull(ikey_main_label_map[primary_ikey]) else ''
 
         tmp_df = dt.loc[dt['uikey'] == uid]
         # if tmp_df.shape[0] > 1:
@@ -282,7 +299,12 @@ def generate_vendor_index(dt, vendor_string, doc_map):
             if 'smiles' in single_comp_dict and single_comp_dict['smiles']:
 
                 smiles = single_comp_dict['smiles']
-                main_label = single_comp_dict['drug_name'][0] if len(single_comp_dict['drug_name']) > 0 else ikey
+                main_label = single_comp_dict['drug_name'][0] if 'drug_name' in single_comp_dict \
+                                                                 and len(single_comp_dict['drug_name']) > 0 else ikey
+
+                if 'main_label' not in tmp_obj or pd.isnull(tmp_obj['main_label']):
+                    tmp_obj['main_label'] = main_label
+
                 # tmp_obj['fingerprint'] = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
 
                 fp = generate_fingerprint(smiles, ikey, main_label, tmp_obj['qid'])
@@ -296,7 +318,7 @@ def generate_vendor_index(dt, vendor_string, doc_map):
 
             tmp_obj[vendor_string].append(single_comp_dict)
 
-        if counter < 4:
+        if counter < 2:
             pprint.pprint(tmp_obj)
 
         update_es(tmp_obj)
@@ -332,8 +354,21 @@ gvk_doc_map = {
     'ikey': 'ikey'
 }
 
+# integrity_doc_map = {
+#     'id': 'id',
+#     'smiles': 'smiles',
+#     'name': ('drug_name', '; '),
+#     'status': ('phase', '; '),
+#     'int_thera_group': ('category', '; ', True),
+#     'int_MoA': ('mechanism', '; ', True),
+#     # 'calibr_note': None,
+#     'ikey': 'ikey',
+#     #'wikidata': 'wikidata',
+#     #'PubChem CID': 'PubChem CID'
+# }
+
 integrity_doc_map = {
-    'id': 'id',
+    'integrity_id': 'id',
     'smiles': 'smiles',
     'name': ('drug_name', '; '),
     'status': ('phase', '; '),
@@ -360,6 +395,20 @@ informa_doc_map = {
     # 'pubchem': 'PubChem CID',
     # 'wikidata': 'wikidata',
     'informa_id': 'informa_id'
+}
+
+adis_doc_map = {
+    # 'hvac_id': 'hvac_id',
+    'adis_id': 'adis_id',
+    # 'calibr_note': None,
+    'approved_name': ('drug_name', '; '),
+    'highest_phase': ('phase', '; '),
+    'therapeutic_areas': ('therapeutic_areas', '; '),
+    'category': ('category', '; ', True),
+    'moa': ('mechanism', '; ', True),
+    'full_smiles': 'smiles',
+    'alternate_names':	('synonyms', '; '),
+    'ikey': 'ikey'
 }
 
 assay_data_doc_map = {
@@ -413,33 +462,50 @@ basic_block = {
 
 data_dir = os.getenv('DATA_DIR')
 # assay_data = pd.read_csv(os.path.join(data_dir, 'reframe_short_20170822.csv'))
-gvk_dt = pd.read_csv(os.path.join(data_dir, '2019-06-24_gvk_annotations.csv'))
-integrity_dt = pd.read_csv(os.path.join(data_dir, '2019-04-15_integrity_annotations.csv'))
-informa_dt = pd.read_csv(os.path.join(data_dir, '2019-05-30_informa_annotations.csv'))
+# gvk_dt = pd.read_csv(os.path.join(data_dir, '2019-06-24_gvk_annotations.csv'))
+# integrity_dt = pd.read_csv(os.path.join(data_dir, '2019-04-15_integrity_annotations.csv'))
+# informa_dt = pd.read_csv(os.path.join(data_dir, '2019-05-30_informa_annotations.csv'))
 annotation_mappings = pd.read_csv(os.path.join(data_dir, 'reframe_annotations_mapping_20200211.csv'))
 
 assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20191104.csv'), header=0)
 assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200229.csv'), header=0)
-vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot_2020-02-29.csv'), sep=',')
+# vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot_2020-02-29.csv'), sep=',')
 salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'))
+
+gvk_dt = pd.read_csv(os.path.join(data_dir, 'gvk_launched_20200414.csv'))
+integrity_dt = pd.read_csv(os.path.join(data_dir, 'integrity_launched_20200414.csv'))
+informa_dt = pd.read_csv(os.path.join(data_dir, 'informa_launched_20200414.csv'))
+adis_dt = pd.read_csv(os.path.join(data_dir, 'adis_launched_20200414.csv'))
+
+vendor_dt = pd.read_csv(os.path.join(data_dir, 'screening_compounds_extended_20200414.csv'))
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 compound_id_fp_map = {}
 no_charge_map = {}
 
-rfm_ikey_map = {x['public_id']: (x['ikey'], x['library'], x['source_id']) for x in
-                vendor_dt[['public_id', 'ikey', 'library', 'source_id']].to_dict(orient='records')}
+rfm_ikey_map = {x['public_id']: (x['ikey'], x['library'], x['source_id'], x['rfm_match_type']) for x in
+                vendor_dt[['public_id', 'ikey', 'library', 'source_id', 'rfm_match_type']].to_dict(orient='records')}
+
+ikey_main_label_map = {x['ikey']: x['main_label'] for x in
+                       vendor_dt[['ikey', 'main_label']].to_dict(orient='records')}
+
+print('Wikidata compound count:', len(ikey_wd_map))
+print('Label count:', len(ikey_main_label_map))
+
 
 # add unifying ikeys and smiles to vendor data dataframes, use vendor specific id as replacement if
 # no ikey can be generated
+print('Generating unifiers ...')
 gvk_dt = generate_unifiers(gvk_dt, 'sub_smiles', 'gvk_id')
 integrity_dt = generate_unifiers(integrity_dt, 'smiles', 'id')
 informa_dt = generate_unifiers(informa_dt, 'smiles', 'informa_id')
+adis_dt = generate_unifiers(adis_dt, 'full_smiles', 'adis_id')
 
-
+print('Generating ES documents ...')
 generate_vendor_index(gvk_dt, 'gvk', gvk_doc_map)
 generate_vendor_index(integrity_dt, 'integrity', integrity_doc_map)
 generate_vendor_index(informa_dt, 'informa', informa_doc_map)
+generate_vendor_index(adis_dt, 'adis', adis_doc_map)
 
 # for counter, uid in enumerate(gvk_dt['uikey'].unique()):
 #     ikey = uid
@@ -617,9 +683,13 @@ for i in assay_data['ikey'].unique():
     if ikey in ikey_wd_map:
         tmp_obj['qid'] = ikey_wd_map[ikey]
 
-    rf, cv = get_rfm_ids(ikey)
+    if ikey in ikey_main_label_map:
+        tmp_obj['main_label'] = ikey_main_label_map[ikey] \
+            if pd.notnull(ikey_main_label_map[ikey]) else ikey
+
+    rf, cv, mt = get_rfm_ids(ikey)
     if len(rf) > 0:
-        tmp_obj['reframe_id'] = rf
+        tmp_obj['reframe_id'] = mt
     if len(cv) > 0:
         tmp_obj['chem_vendors'] = cv
 
@@ -686,44 +756,44 @@ for i in assay_data['ikey'].unique():
 
     update_es(tmp_obj)
 
-print('adding stereofree matches ...')
-stereofree_list = [x[:15] for x in compound_id_fp_map.keys() if pd.notnull(x) and len(x) > 15]
-for i in vendor_dt['ikey'].unique():
-    if es.exists(index='reframe', doc_type='compound', id=i):
-        continue
-
-    if pd.isnull(i) or (pd.notnull(i) and i[:15] not in stereofree_list):
-        continue
-
-    tmp_obj = copy.deepcopy(reframe_doc)
-    tmp_obj['ikey'] = i
-    ikey = i
-    print(i)
-
-    if ikey in ikey_wd_map:
-        tmp_obj['qid'] = ikey_wd_map[ikey]
-
-    rf, cv = get_rfm_ids(ikey)
-    if len(rf) > 0:
-        tmp_obj['reframe_id'] = rf
-    if len(cv) > 0:
-        tmp_obj['chem_vendors'] = cv
-
-    if pd.isnull(ikey):
-        continue
-
-    for c, x in vendor_dt.loc[vendor_dt['ikey'] == i, :].iterrows():
-
-        if pd.notnull(x['fixed_smiles']):
-            tmp_obj['smiles'] = x['fixed_smiles']
-
-            # when there is no vendor annotation data, make sure there's still a fingerprint
-            if not ('fingerprint' in tmp_obj and len(tmp_obj['fingerprint']) > 0):
-                fp = generate_fingerprint(x['smiles'], ikey, x['fixed_smiles'], tmp_obj['qid'])
-                if len(fp) > 0:
-                    tmp_obj['fingerprint'] = fp
-
-    update_es(tmp_obj)
+# print('adding stereofree matches ...')
+# stereofree_list = [x[:15] for x in compound_id_fp_map.keys() if pd.notnull(x) and len(x) > 15]
+# for i in vendor_dt['ikey'].unique():
+#     if es.exists(index='reframe', doc_type='compound', id=i):
+#         continue
+#
+#     if pd.isnull(i) or (pd.notnull(i) and i[:15] not in stereofree_list):
+#         continue
+#
+#     tmp_obj = copy.deepcopy(reframe_doc)
+#     tmp_obj['ikey'] = i
+#     ikey = i
+#     print(i)
+#
+#     if ikey in ikey_wd_map:
+#         tmp_obj['qid'] = ikey_wd_map[ikey]
+#
+#     rf, cv = get_rfm_ids(ikey)
+#     if len(rf) > 0:
+#         tmp_obj['reframe_id'] = rf
+#     if len(cv) > 0:
+#         tmp_obj['chem_vendors'] = cv
+#
+#     if pd.isnull(ikey):
+#         continue
+#
+#     for c, x in vendor_dt.loc[vendor_dt['ikey'] == i, :].iterrows():
+#
+#         if pd.notnull(x['fixed_smiles']):
+#             tmp_obj['smiles'] = x['fixed_smiles']
+#
+#             # when there is no vendor annotation data, make sure there's still a fingerprint
+#             if not ('fingerprint' in tmp_obj and len(tmp_obj['fingerprint']) > 0):
+#                 fp = generate_fingerprint(x['smiles'], ikey, x['fixed_smiles'], tmp_obj['qid'])
+#                 if len(fp) > 0:
+#                     tmp_obj['fingerprint'] = fp
+#
+#     update_es(tmp_obj)
 
 
 for c, (compound_id, values) in enumerate(compound_id_fp_map.items()):

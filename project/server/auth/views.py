@@ -265,7 +265,7 @@ def get_dotplot_data(aid):
         x = z['_source']
         compound_id = z['_id']
         compound_name = ''
-        for vendor in ['integrity', 'gvk', 'informa']:
+        for vendor in ['integrity', 'gvk', 'informa', 'adis']:
             if compound_name and compound_name != z['_id']:
                 continue
             elif vendor in x and len(x[vendor]) > 0 and x[vendor][0]['drug_name'][0]:
@@ -871,7 +871,7 @@ class SearchAPI(MethodView):
             'assay_types': [],  # list of available assay types
             'tanimoto': 0,
             'similar_compounds': [],
-            'reframeid': False,
+            'reframeid': '',
             'smiles': '',
             'pubchem': '',
             'properties': [
@@ -882,6 +882,8 @@ class SearchAPI(MethodView):
                 {'name': 'GVK', 'tooltip': 'annotation data available from GVK-Excelra GOSTAR', 'value': False},
                 {'name': 'Integrity', 'tooltip': 'annotation data available from Clarivate Integrity', 'value': False},
                 {'name': 'Citeline', 'tooltip': 'annotation data available from Citeline Pharmaprojects', 'value': False},
+                {'name': 'Adis', 'tooltip': 'annotation data available from Adis Pharmacovigilance',
+                 'value': False},
             ]
         }
 
@@ -916,8 +918,9 @@ class SearchAPI(MethodView):
             if qid:
                 search_result['properties'][2]['value'] = True
 
+        # When a search result has a screening result, set the search result property to True
         if 'reframe_id' in data and len(data['reframe_id']) > 0:
-            search_result['reframeid'] = True
+            search_result['reframeid'] = data['reframe_id'][0]
             search_result['properties'][0]['value'] = True
         else:
             search_result['reframeid'] = False
@@ -931,7 +934,7 @@ class SearchAPI(MethodView):
         if wd_main_label:
             labels.add(wd_main_label)
 
-        for vendor, i in [('gvk', 3), ('informa', 5), ('integrity', 4)]:
+        for vendor, i in [('gvk', 3), ('informa', 5), ('integrity', 4), ('adis', 6)]:
 
             # make sure that if no data on a certain vendor exists, key is skipped
             if vendor not in data or (vendor in data and len(data[vendor]) == 0):
@@ -939,10 +942,13 @@ class SearchAPI(MethodView):
 
             search_result['properties'][i]['value'] = True
 
+            # add main label (should replace most of the following lines)
+            labels.add(data['main_label'])
             # collect all label candidates and aliases
             for x in data[vendor]:
-                labels.add(x['drug_name'][0])
-                aliases.update(data[vendor][0]['drug_name'])
+                if 'drug_name' in x:
+                    labels.add(x['drug_name'][0])
+                    aliases.update(data[vendor][0]['drug_name'])
 
             if 'synonyms' in data[vendor]:
                 aliases.update(data[vendor][0]['synonyms'])

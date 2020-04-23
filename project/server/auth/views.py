@@ -1025,6 +1025,43 @@ class SearchAPI(MethodView):
             }
         }
 
+        body = {
+            "from": 0, "size": 250,
+            "query": {
+                "multi_match": {
+
+                        "query": "{}".format(search_term),
+                        "type": "cross_fields",
+                    # "type": "phrase_prefix",
+                        "minimum_should_match": "99%",
+                        "fields": [
+                            "main_label^4",
+                            "ikey",
+                            "qid",
+
+                            # those fields break the query, bc the data type is Integer
+                            # "integrity.id",
+                            # "gvk.gvk_id",
+                            # "adis.adis_id",
+                            # "informa.informa_id",
+
+                            "*.drug_name^3",
+                            "*.synonyms^3",
+                            "*.phase",
+                            "*.mechanism.label",
+                            "*.mechanism.wikidata",
+                            "*.category.label",
+                            "*.category.wikidata",
+                            "*.roa",
+                            "*.target_name",
+                            "*.target_families",
+                            "*.ikey",
+                        ]
+
+                }
+            }
+        }
+
         # body = {
         #     "from": 0, "size": 100,
         #     "query": {

@@ -31,9 +31,9 @@ auth_blueprint = Blueprint('auth', __name__)
 
 data_dir = os.getenv('DATA_DIR')
 
-assay_descrip = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20191104.csv'), header=0, index_col=False)
+assay_descrip = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20200425.csv'), header=0, index_col=False, encoding='UTF-8')
 
-plot_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200120.csv'), header=0)
+# plot_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200120.csv'), header=0)
 
 #
 # assay_data = pd.read_csv(data_dir + 'reframe_short_20170822.csv')
@@ -253,7 +253,7 @@ def get_dotplot_data(aid):
     print(aid)
     try:
         res = es.search(index='reframe', body=body)
-        print(res)
+        # print(res)
     except Exception as e:
 
         print(aid)
@@ -264,11 +264,12 @@ def get_dotplot_data(aid):
     for z in res['hits']['hits']:
         x = z['_source']
         compound_id = z['_id']
+        # compound_name = x['main_label'] if 'main_label' in x else ''
         compound_name = ''
         for vendor in ['integrity', 'gvk', 'informa', 'adis']:
             if compound_name and compound_name != z['_id']:
                 continue
-            elif vendor in x and len(x[vendor]) > 0 and x[vendor][0]['drug_name'][0]:
+            elif vendor in x and len(x[vendor]) > 0 and 'drug_name' in x[vendor][0] and x[vendor][0]['drug_name'][0]:
                 compound_name = x[vendor][0]['drug_name'][0]
             else:
                 compound_name = z['_id']
@@ -290,7 +291,7 @@ def get_dotplot_data(aid):
 
             }
             assay_data.append(temp)
-    print(assay_data)
+    # print(assay_data)
 
     # assay_data = []
     # # filter out data: selected assay, valid AC50 value
@@ -1030,33 +1031,32 @@ class SearchAPI(MethodView):
             "query": {
                 "multi_match": {
 
-                        "query": "{}".format(search_term),
-                        "type": "cross_fields",
-                    # "type": "phrase_prefix",
-                        "minimum_should_match": "99%",
-                        "fields": [
-                            "main_label^4",
-                            "ikey",
-                            "qid",
+                    "query": "{}".format(search_term),
+                    "type": "cross_fields",
+                    #     "minimum_should_match": "99%",
+                    "fields": [
+                        "main_label^4",
+                        "ikey",
+                        "qid",
 
-                            # those fields break the query, bc the data type is Integer
-                            # "integrity.id",
-                            # "gvk.gvk_id",
-                            # "adis.adis_id",
-                            # "informa.informa_id",
+                        # those fields break the query, bc the data type is Integer
+                        # "integrity.id",
+                        # "gvk.gvk_id",
+                        # "adis.adis_id",
+                        # "informa.informa_id",
 
-                            "*.drug_name^3",
-                            "*.synonyms^3",
-                            "*.phase",
-                            "*.mechanism.label",
-                            "*.mechanism.wikidata",
-                            "*.category.label",
-                            "*.category.wikidata",
-                            "*.roa",
-                            "*.target_name",
-                            "*.target_families",
-                            "*.ikey",
-                        ]
+                        "*.drug_name^3",
+                        "*.synonyms^3",
+                        "*.phase",
+                        "*.mechanism.label",
+                        "*.mechanism.wikidata",
+                        "*.category.label",
+                        "*.category.wikidata",
+                        "*.roa",
+                        "*.target_name",
+                        "*.target_families",
+                        "*.ikey",
+                    ]
 
                 }
             }

@@ -467,8 +467,8 @@ data_dir = os.getenv('DATA_DIR')
 # informa_dt = pd.read_csv(os.path.join(data_dir, '2019-05-30_informa_annotations.csv'))
 annotation_mappings = pd.read_csv(os.path.join(data_dir, 'reframe_annotations_mapping_20200211.csv'))
 
-assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20191104.csv'), header=0)
-assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200229.csv'), header=0)
+assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20200425.csv'), header=0)
+assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200425.csv'), header=0)
 # vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot_2020-02-29.csv'), sep=',')
 salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'))
 
@@ -732,11 +732,11 @@ for i in assay_data['ikey'].unique():
 
             if k == 'ac_precision':
                 precision = x['ac_precision']
-                if precision == 'equal':
+                if precision.lower() == 'equal':
                     tt.update({'ac_precision': ''})
-                elif precision == 'greater than':
+                elif precision.lower() == 'greater than':
                     tt.update({'ac_precision': '>'})
-                elif precision == 'less than':
+                elif precision.lower() == 'less than':
                     tt.update({'ac_precision': '<'})
 
                 continue

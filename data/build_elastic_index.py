@@ -87,6 +87,8 @@ def get_rfm_ids(ikey):
 
     tdf = vendor_dt.loc[vendor_dt.ikey == ikey, :]
     rfm_ids = list(tdf.public_id.values)
+    # add to list of all data vendor associated RFM ids.
+    covered_rfm_ids.update(rfm_ids)
     chem_vendors = [{'chem_vendor': x['library'] if pd.notnull(x['library']) else '',
                      'chem_vendor_id': x['source_id'] if pd.notnull(x['source_id']) else ''}
                     for x in tdf[['library', 'source_id']].to_dict('records')]
@@ -467,8 +469,8 @@ data_dir = os.getenv('DATA_DIR')
 # informa_dt = pd.read_csv(os.path.join(data_dir, '2019-05-30_informa_annotations.csv'))
 annotation_mappings = pd.read_csv(os.path.join(data_dir, 'reframe_annotations_mapping_20200211.csv'))
 
-assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20200425.csv'), header=0)
-assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200425.csv'), header=0)
+assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20200427.csv'), header=0)
+assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200427.csv'), header=0)
 # vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot_2020-02-29.csv'), sep=',')
 salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'))
 
@@ -482,6 +484,7 @@ vendor_dt = pd.read_csv(os.path.join(data_dir, 'screening_compounds_extended_202
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 compound_id_fp_map = {}
 no_charge_map = {}
+covered_rfm_ids = set()
 
 rfm_ikey_map = {x['public_id']: (x['ikey'], x['library'], x['source_id'], x['rfm_match_type']) for x in
                 vendor_dt[['public_id', 'ikey', 'library', 'source_id', 'rfm_match_type']].to_dict(orient='records')}
@@ -686,6 +689,8 @@ for i in assay_data['ikey'].unique():
     if ikey in ikey_main_label_map:
         tmp_obj['main_label'] = ikey_main_label_map[ikey] \
             if pd.notnull(ikey_main_label_map[ikey]) else ikey
+    else:
+        tmp_obj['main_label'] = ikey
 
     rf, cv, mt = get_rfm_ids(ikey)
     if len(rf) > 0:
@@ -696,16 +701,13 @@ for i in assay_data['ikey'].unique():
     if pd.isnull(ikey):
         continue
 
+    rfm_ids = []
     for c, x in assay_data.loc[assay_data['ikey'] == i, :].iterrows():
+        rfm_ids.append(x['rfm_id'])
+
         # important to use smiles with fixed kekule structure
         if pd.notnull(x['fixed_smiles']):
             tmp_obj['smiles'] = x['fixed_smiles']
-
-            # when there is no vendor annotation data, make sure there's still a fingerprint
-            if not ('fingerprint' in tmp_obj and len(tmp_obj['fingerprint']) > 0):
-                fp = generate_fingerprint(x['smiles'], ikey, x['fixed_smiles'], tmp_obj['qid'])
-                if len(fp) > 0:
-                    tmp_obj['fingerprint'] = fp
 
         tt = {
             'assay_id': '',
@@ -719,13 +721,12 @@ for i in assay_data['ikey'].unique():
 
             if k == 'datamode':
                 datamode = x['datamode'].upper()
-                if datamode not in ['DECREASING', 'INCREASING', 'SUPER_ACTIVE']:
-                    continue
-                elif datamode == 'DECREASING':
+
+                if datamode.startswith('DECREASING'):
                     tt.update({'activity_type': 'IC50'})
-                elif datamode == 'INCREASING':
+                elif datamode.startswith('INCREASING'):
                     tt.update({'activity_type': 'EC50'})
-                elif datamode == 'SUPER_ACTIVE':
+                elif datamode.startswith('SUPER_ACTIVE'):
                     tt.update({'activity_type': 'SUPER ACTIVE'})
 
                 continue
@@ -754,7 +755,25 @@ for i in assay_data['ikey'].unique():
 
         tmp_obj['assay'].append(tt)
 
-    update_es(tmp_obj)
+    # make sure to only add an assay to an existing document, or create a new one if document does not exists
+    add_assay = False
+    if es.exists(index='reframe', doc_type='compound', id=ikey):
+        add_assay = True
+    elif not es.exists(index='reframe', doc_type='compound', id=ikey) and not any([x in covered_rfm_ids for x in rfm_ids]):
+        add_assay = True
+
+    # when adding the assay, make sure, also the fingerprint is being added.
+    # This is required here, fingerprint must not end up in similarity index if assay data dont get added to ES.
+    if add_assay:
+        # when there is no vendor annotation data, make sure there's still a fingerprint
+        if not ('fingerprint' in tmp_obj and len(tmp_obj['fingerprint']) > 0) and 'smiles' in tmp_obj and tmp_obj['smiles']:
+            fp = generate_fingerprint(tmp_obj['smiles'], ikey, tmp_obj['main_label'], tmp_obj['qid'])
+            if len(fp) > 0:
+                tmp_obj['fingerprint'] = fp
+
+        update_es(tmp_obj)
+
+    covered_rfm_ids.update(rfm_ids)
 
 # print('adding stereofree matches ...')
 # stereofree_list = [x[:15] for x in compound_id_fp_map.keys() if pd.notnull(x) and len(x) > 15]
@@ -847,7 +866,7 @@ qids = ["Q27286421", "Q27088554", "Q27291538", "Q27077191", "Q15411004"]
 ikeys = ['WXNRAKRZUCLRBP-UHFFFAOYSA-N',
          'NNBGCSGCRSCFEA-UHFFFAOYSA-N',
          'MPMZSZMDCRPSRF-UHFFFAOYSA-N',
-         'ONPGOSVDVDPBCY-CQSZACIVSA-N',
+         # 'ONPGOSVDVDPBCY-CQSZACIVSA-N',
          'WXJFKKQWPMNTIM-VWLOTQADSA-N'
          ]
 

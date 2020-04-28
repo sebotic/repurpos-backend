@@ -31,7 +31,7 @@ auth_blueprint = Blueprint('auth', __name__)
 
 data_dir = os.getenv('DATA_DIR')
 
-assay_descrip = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20200425.csv'), header=0, index_col=False, encoding='UTF-8')
+assay_descrip = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20200427.csv'), header=0, index_col=False, encoding='UTF-8')
 
 # plot_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200120.csv'), header=0)
 
@@ -226,19 +226,19 @@ def get_assay_list():
 
 
 def get_dotplot_data(aid):
-    def find_type(datamode):
-        if datamode.lower() == 'decreasing':
-            return 'IC'
-        elif datamode.lower() == 'increasing':
-            return 'EC'
-        else:
-            return 'unknown'
-
-    def find_name(row):
-        if pd.isnull(row.pubchem_label):
-            return row.ikey
-        else:
-            return row.pubchem_label
+    # def find_type(datamode):
+    #     if datamode.lower() == 'decreasing':
+    #         return 'IC'
+    #     elif datamode.lower() == 'increasing':
+    #         return 'EC'
+    #     else:
+    #         return 'unknown'
+    #
+    # def find_name(row):
+    #     if pd.isnull(row.pubchem_label):
+    #         return row.ikey
+    #     else:
+    #         return row.pubchem_label
 
     body = {
         "from": 0, "size": 2000,
@@ -1085,6 +1085,7 @@ class SearchAPI(MethodView):
         for x in res['hits']['hits']:
             compound_id = ''
             qid = ''
+            # print(x['_score'], x['_source']['main_label'])
 
             if x['_index'] == 'reframe':
                 compound_id = x['_id']

@@ -726,7 +726,8 @@ for i in assay_data['ikey'].unique():
                     tt.update({'activity_type': 'IC50'})
                 elif datamode.startswith('INCREASING'):
                     tt.update({'activity_type': 'EC50'})
-                elif datamode.startswith('SUPER_ACTIVE'):
+                #
+                elif datamode.startswith('SUPER'):
                     tt.update({'activity_type': 'SUPER ACTIVE'})
 
                 continue
@@ -773,7 +774,7 @@ for i in assay_data['ikey'].unique():
 
         update_es(tmp_obj)
 
-    covered_rfm_ids.update(rfm_ids)
+        covered_rfm_ids.update(rfm_ids)
 
 # print('adding stereofree matches ...')
 # stereofree_list = [x[:15] for x in compound_id_fp_map.keys() if pd.notnull(x) and len(x) > 15]

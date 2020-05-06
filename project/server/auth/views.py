@@ -282,10 +282,10 @@ def get_dotplot_data(aid):
                 'assay_title': a['assay_title'],
                 'calibr_id': z['_id'],
                 'name': compound_name,
-                'ac50': a['ac50'],
-                'assay_type': a['activity_type'],
-                'efficacy': a['efficacy'],
-                'r_sq': a['rsquared'],
+                'ac50': a['ac50'] if 'ac50' in a else 1e-10,
+                'assay_type': a['activity_type'] if 'activity_type' in a else '',
+                'efficacy': a['efficacy'] if 'efficacy' in a else 0,
+                'r_sq': a['rsquared'] if 'rsquared' in a else 0,
                 'pubchem_id': '',
                 'url': '/compound_data/{}'.format(z['_id']) if not x['qid'] else '/compound_data/{};qid={}'.format(z['_id'], x['qid'])
 
@@ -1014,53 +1014,54 @@ class SearchAPI(MethodView):
                 raise e
 
     @staticmethod
-    def exec_freetext_search(search_term, indices=('reframe', 'wikidata')):
-        body = {
-            "from": 0, "size": 250,
-            "query": {
-                "query_string": {
-                    "default_operator": "AND",
+    def exec_freetext_search(search_term, indices=('reframe', 'wikidata'), search_type='string'):
+        if search_type == 'structure':
+            body = {
+                "from": 0, "size": 250,
+                "query": {
+                    "query_string": {
+                        "default_operator": "AND",
 
-                    "query": "{}*".format(search_term)
+                        "query": "{}*".format(search_term)
+                    }
                 }
             }
-        }
+        else:
+            body = {
+                "from": 0, "size": 250,
+                "query": {
+                    "multi_match": {
 
-        body = {
-            "from": 0, "size": 250,
-            "query": {
-                "multi_match": {
+                        "query": "{}".format(search_term),
+                        "type": "cross_fields",
+                        #     "minimum_should_match": "99%",
+                        "fields": [
+                            "main_label^4",
+                            "ikey",
+                            "qid",
 
-                    "query": "{}".format(search_term),
-                    "type": "cross_fields",
-                    #     "minimum_should_match": "99%",
-                    "fields": [
-                        "main_label^4",
-                        "ikey",
-                        "qid",
+                            # those fields break the query, bc the data type is Integer
+                            # "integrity.id",
+                            # "gvk.gvk_id",
+                            # "adis.adis_id",
+                            # "informa.informa_id",
 
-                        # those fields break the query, bc the data type is Integer
-                        # "integrity.id",
-                        # "gvk.gvk_id",
-                        # "adis.adis_id",
-                        # "informa.informa_id",
+                            "*.drug_name^3",
+                            "*.synonyms^3",
+                            "*.phase",
+                            "*.mechanism.label",
+                            "*.mechanism.wikidata",
+                            "*.category.label",
+                            "*.category.wikidata",
+                            "*.roa",
+                            "*.target_name",
+                            "*.target_families",
+                            "*.ikey",
+                        ]
 
-                        "*.drug_name^3",
-                        "*.synonyms^3",
-                        "*.phase",
-                        "*.mechanism.label",
-                        "*.mechanism.wikidata",
-                        "*.category.label",
-                        "*.category.wikidata",
-                        "*.roa",
-                        "*.target_name",
-                        "*.target_families",
-                        "*.ikey",
-                    ]
-
+                    }
                 }
             }
-        }
 
         # body = {
         #     "from": 0, "size": 100,
@@ -1190,7 +1191,7 @@ class SearchAPI(MethodView):
                 if search_mode == 'stereofree':
                     ikey = ikey[:15]
 
-                results = SearchAPI.exec_freetext_search(ikey)
+                results = SearchAPI.exec_freetext_search(ikey, search_type=search_type)
             except Exception as e:
                 return make_response(jsonify({'status': 'fail', 'results': []})), 500
 

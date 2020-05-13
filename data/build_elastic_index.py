@@ -771,8 +771,11 @@ for i in assay_data['ikey'].unique():
             fp = generate_fingerprint(tmp_obj['smiles'], ikey, tmp_obj['main_label'], tmp_obj['qid'])
             if len(fp) > 0:
                 tmp_obj['fingerprint'] = fp
-
-        update_es(tmp_obj)
+        try:
+            update_es(tmp_obj)
+        except Exception as e:
+            print(e)
+            print(tmp_obj)
 
         covered_rfm_ids.update(rfm_ids)
 

@@ -1033,7 +1033,8 @@ class SearchAPI(MethodView):
                     "multi_match": {
 
                         "query": "{}".format(search_term),
-                        "type": "cross_fields",
+                        # "type": "cross_fields",
+                        "type": "phrase_prefix",
                         #     "minimum_should_match": "99%",
                         "fields": [
                             "main_label^4",

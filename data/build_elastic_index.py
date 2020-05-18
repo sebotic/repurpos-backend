@@ -477,9 +477,12 @@ salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'
 gvk_dt = pd.read_csv(os.path.join(data_dir, 'gvk_launched_20200414.csv'))
 integrity_dt = pd.read_csv(os.path.join(data_dir, 'integrity_launched_20200414.csv'))
 informa_dt = pd.read_csv(os.path.join(data_dir, 'informa_launched_20200414.csv'))
+# fix informa name separator issue
+informa_dt['name'] = informa_dt['name'].map(lambda x: '\n'.join(x.split('; ')))
+
 adis_dt = pd.read_csv(os.path.join(data_dir, 'adis_launched_20200414.csv'))
 
-vendor_dt = pd.read_csv(os.path.join(data_dir, 'screening_compounds_extended_20200414.csv'))
+vendor_dt = pd.read_csv(os.path.join(data_dir, 'screening_compounds_extended_20200518.csv'))
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 compound_id_fp_map = {}

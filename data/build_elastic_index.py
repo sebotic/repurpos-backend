@@ -483,7 +483,7 @@ informa_dt['name'] = informa_dt['name'].map(lambda x: '\n'.join(x.split('; ')))
 
 adis_dt = pd.read_csv(os.path.join(data_dir, 'adis_launched_20200414.csv'))
 
-vendor_dt = pd.read_csv(os.path.join(data_dir, 'screening_compounds_extended_20200518.csv'))
+vendor_dt = pd.read_csv(os.path.join(data_dir, 'screening_compounds_extended_20200604.csv'))
 # primary_screening_data = pd.read_csv(os.path.join(data_dir, 'primary_test_data.csv'))
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')

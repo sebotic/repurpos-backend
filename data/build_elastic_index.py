@@ -451,7 +451,8 @@ reframe_doc = {
     # 'gvk': [],
     # 'integrity': [],
     # 'informa': [],
-    'assay': []
+    # 'assay': [],
+    'primary_screening_data': []
 
 }
 
@@ -469,13 +470,13 @@ data_dir = os.getenv('DATA_DIR')
 # informa_dt = pd.read_csv(os.path.join(data_dir, '2019-05-30_informa_annotations.csv'))
 annotation_mappings = pd.read_csv(os.path.join(data_dir, 'reframe_annotations_mapping_20200211.csv'))
 
-assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20200513.csv'), header=0)
-assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200513.csv'), header=0)
+assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20200614.csv'), header=0)
+assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200614.csv'), header=0)
 # vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot_2020-02-29.csv'), sep=',')
 salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'))
 
-gvk_dt = pd.read_csv(os.path.join(data_dir, 'gvk_launched_20200414.csv'))
-integrity_dt = pd.read_csv(os.path.join(data_dir, 'integrity_launched_20200414.csv'))
+gvk_dt = pd.read_csv(os.path.join(data_dir, 'gvk_launched_20200614.csv'))
+integrity_dt = pd.read_csv(os.path.join(data_dir, 'integrity_launched_20200614.csv'))
 informa_dt = pd.read_csv(os.path.join(data_dir, 'informa_launched_20200414.csv'))
 # fix informa name separator issue
 informa_dt['name'] = informa_dt['name'].map(lambda x: '\n'.join(x.split('; ')))
@@ -483,6 +484,7 @@ informa_dt['name'] = informa_dt['name'].map(lambda x: '\n'.join(x.split('; ')))
 adis_dt = pd.read_csv(os.path.join(data_dir, 'adis_launched_20200414.csv'))
 
 vendor_dt = pd.read_csv(os.path.join(data_dir, 'screening_compounds_extended_20200518.csv'))
+# primary_screening_data = pd.read_csv(os.path.join(data_dir, 'primary_test_data.csv'))
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 compound_id_fp_map = {}
@@ -757,6 +759,8 @@ for i in assay_data['ikey'].unique():
                         tt['title_short'] = ad['title_short']
                         tt['indication'] = ad['indication']
 
+        if 'assay' not in tmp_obj:
+            tmp_obj.update({'assay': []})
         tmp_obj['assay'].append(tt)
 
     # make sure to only add an assay to an existing document, or create a new one if document does not exists
@@ -781,6 +785,51 @@ for i in assay_data['ikey'].unique():
             print(tmp_obj)
 
         covered_rfm_ids.update(rfm_ids)
+
+# # add primary screening data
+# for i in primary_screening_data['ikey'].unique():
+#     tmp_obj = copy.deepcopy(reframe_doc)
+#     tmp_obj['ikey'] = i
+#     ikey = i
+#     # print(i)
+#
+#     if ikey in ikey_wd_map:
+#         tmp_obj['qid'] = ikey_wd_map[ikey]
+#
+#     if ikey in ikey_main_label_map:
+#         tmp_obj['main_label'] = ikey_main_label_map[ikey] \
+#             if pd.notnull(ikey_main_label_map[ikey]) else ikey
+#     else:
+#         tmp_obj['main_label'] = ikey
+#
+#     rf, cv, mt = get_rfm_ids(ikey)
+#     if len(rf) > 0:
+#         tmp_obj['reframe_id'] = mt
+#     if len(cv) > 0:
+#         tmp_obj['chem_vendors'] = cv
+#
+#     if pd.isnull(ikey):
+#         continue
+#
+#     for c, x in primary_screening_data.loc[primary_screening_data['ikey'] == i, :].iterrows():
+#         tt = {
+#             'assay_id': x.assay_id,
+#             'title_short': x.assay_title,
+#             'indication': x.indication,
+#             'hit': x.screening_hit
+#         }
+#
+#         tmp_obj['primary_screening_data'].append(tt)
+#
+#     # make sure to only add an assay to an existing document, or create a new one if document does not exists
+#     if es.exists(index='reframe', doc_type='compound', id=ikey):
+#         try:
+#             update_es(tmp_obj)
+#         except Exception as e:
+#             print(e)
+#             print(tmp_obj)
+
+
 
 # print('adding stereofree matches ...')
 # stereofree_list = [x[:15] for x in compound_id_fp_map.keys() if pd.notnull(x) and len(x) > 15]

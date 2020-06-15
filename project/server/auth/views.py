@@ -989,9 +989,10 @@ class SearchAPI(MethodView):
         search_result['aliases'] = list(aliases)
 
         unique_assays = set()
-        for assay in data['assay']:
-            unique_assays.add((assay['title_short'], assay['assay_id'], assay['indication'] if 'assay_id' in assay else ''))
-            search_result['properties'][1]['value'] = True
+        if 'assay' in data:
+            for assay in data['assay']:
+                unique_assays.add((assay['title_short'], assay['assay_id'], assay['indication'] if 'assay_id' in assay else ''))
+                search_result['properties'][1]['value'] = True
 
         search_result['assay_types'] = list(unique_assays)
 

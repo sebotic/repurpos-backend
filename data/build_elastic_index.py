@@ -451,8 +451,9 @@ reframe_doc = {
     # 'gvk': [],
     # 'integrity': [],
     # 'informa': [],
-    # 'assay': [],
-    'primary_screening_data': []
+    'assay': [],
+
+    # 'primary_screening_data': []
 
 }
 
@@ -470,8 +471,8 @@ data_dir = os.getenv('DATA_DIR')
 # informa_dt = pd.read_csv(os.path.join(data_dir, '2019-05-30_informa_annotations.csv'))
 annotation_mappings = pd.read_csv(os.path.join(data_dir, 'reframe_annotations_mapping_20200211.csv'))
 
-assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20200614.csv'), header=0)
-assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200614.csv'), header=0)
+assay_descr = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20200618.csv'), header=0)
+assay_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200618.csv'), header=0)
 # vendor_dt = pd.read_csv(os.path.join(data_dir, 'portal_info_annot_2020-02-29.csv'), sep=',')
 salt_frequencies = pd.read_csv(os.path.join(data_dir, 'salt_frequency_table.csv'))
 
@@ -483,7 +484,7 @@ informa_dt['name'] = informa_dt['name'].map(lambda x: '\n'.join(x.split('; ')))
 
 adis_dt = pd.read_csv(os.path.join(data_dir, 'adis_launched_20200414.csv'))
 
-vendor_dt = pd.read_csv(os.path.join(data_dir, 'screening_compounds_extended_20200604.csv'))
+vendor_dt = pd.read_csv(os.path.join(data_dir, 'screening_compounds_extended_20200618.csv'))
 # primary_screening_data = pd.read_csv(os.path.join(data_dir, 'primary_test_data.csv'))
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')

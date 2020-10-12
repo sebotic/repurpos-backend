@@ -453,7 +453,7 @@ reframe_doc = {
     # 'informa': [],
     'assay': [],
 
-    # 'primary_screening_data': []
+    'primary_screening_data': []
 
 }
 
@@ -485,7 +485,7 @@ informa_dt['name'] = informa_dt['name'].map(lambda x: '\n'.join(x.split('; ')))
 adis_dt = pd.read_csv(os.path.join(data_dir, 'adis_launched_20200414.csv'))
 
 vendor_dt = pd.read_csv(os.path.join(data_dir, 'screening_compounds_extended_20200618.csv'))
-# primary_screening_data = pd.read_csv(os.path.join(data_dir, 'primary_test_data.csv'))
+primary_screening_data = pd.read_csv(os.path.join(data_dir, 'primary_screening_data_sars-cov2_20201012.csv'))
 
 ikey_wd_map = wdi.wdi_helpers.id_mapper('P235')
 compound_id_fp_map = {}
@@ -787,48 +787,51 @@ for i in assay_data['ikey'].unique():
 
         covered_rfm_ids.update(rfm_ids)
 
-# # add primary screening data
-# for i in primary_screening_data['ikey'].unique():
-#     tmp_obj = copy.deepcopy(reframe_doc)
-#     tmp_obj['ikey'] = i
-#     ikey = i
-#     # print(i)
-#
-#     if ikey in ikey_wd_map:
-#         tmp_obj['qid'] = ikey_wd_map[ikey]
-#
-#     if ikey in ikey_main_label_map:
-#         tmp_obj['main_label'] = ikey_main_label_map[ikey] \
-#             if pd.notnull(ikey_main_label_map[ikey]) else ikey
-#     else:
-#         tmp_obj['main_label'] = ikey
-#
-#     rf, cv, mt = get_rfm_ids(ikey)
-#     if len(rf) > 0:
-#         tmp_obj['reframe_id'] = mt
-#     if len(cv) > 0:
-#         tmp_obj['chem_vendors'] = cv
-#
-#     if pd.isnull(ikey):
-#         continue
-#
-#     for c, x in primary_screening_data.loc[primary_screening_data['ikey'] == i, :].iterrows():
-#         tt = {
-#             'assay_id': x.assay_id,
-#             'title_short': x.assay_title,
-#             'indication': x.indication,
-#             'hit': x.screening_hit
-#         }
-#
-#         tmp_obj['primary_screening_data'].append(tt)
-#
-#     # make sure to only add an assay to an existing document, or create a new one if document does not exists
-#     if es.exists(index='reframe', doc_type='compound', id=ikey):
-#         try:
-#             update_es(tmp_obj)
-#         except Exception as e:
-#             print(e)
-#             print(tmp_obj)
+# add primary screening data
+for i in primary_screening_data['ikey'].unique():
+    tmp_obj = copy.deepcopy(reframe_doc)
+    tmp_obj['ikey'] = i
+
+    # in order not to overwrite assay data, empty assay list key needs to be deleted!!
+    del tmp_obj['assay']
+    ikey = i
+    # print(i)
+
+    if ikey in ikey_wd_map:
+        tmp_obj['qid'] = ikey_wd_map[ikey]
+
+    if ikey in ikey_main_label_map:
+        tmp_obj['main_label'] = ikey_main_label_map[ikey] \
+            if pd.notnull(ikey_main_label_map[ikey]) else ikey
+    else:
+        tmp_obj['main_label'] = ikey
+
+    rf, cv, mt = get_rfm_ids(ikey)
+    if len(rf) > 0:
+        tmp_obj['reframe_id'] = mt
+    if len(cv) > 0:
+        tmp_obj['chem_vendors'] = cv
+
+    if pd.isnull(ikey):
+        continue
+
+    for c, x in primary_screening_data.loc[primary_screening_data['ikey'] == i, :].iterrows():
+        tt = {
+            'assay_id': x.assay_id,
+            'title_short': x.assay_title,
+            'indication': x.indication,
+            'hit': x.screening_hit
+        }
+
+        tmp_obj['primary_screening_data'].append(tt)
+
+    # make sure to only add an assay to an existing document, or create a new one if document does not exists
+    if es.exists(index='reframe', doc_type='compound', id=ikey):
+        try:
+            update_es(tmp_obj)
+        except Exception as e:
+            print(e)
+            print(tmp_obj)
 
 
 

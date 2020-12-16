@@ -281,6 +281,7 @@ def get_dotplot_data(aid):
             temp = {
                 'assay_title': a['assay_title'],
                 'calibr_id': z['_id'],
+                'smiles': x['smiles'] if 'smiles' in x else 0,
                 'name': compound_name,
                 'ac50': a['ac50'] if 'ac50' in a else 1e-10,
                 'assay_type': a['activity_type'] if 'activity_type' in a else '',
@@ -288,7 +289,6 @@ def get_dotplot_data(aid):
                 'r_sq': a['rsquared'] if 'rsquared' in a else 0,
                 'pubchem_id': '',
                 'url': '/compound_data/{}'.format(z['_id']) if not x['qid'] else '/compound_data/{};qid={}'.format(z['_id'], x['qid'])
-
             }
             assay_data.append(temp)
     # print(assay_data)

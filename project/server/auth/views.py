@@ -287,6 +287,7 @@ def get_dotplot_data(aid):
                 'assay_type': a['activity_type'] if 'activity_type' in a else '',
                 'efficacy': a['efficacy'] if 'efficacy' in a else 0,
                 'r_sq': a['rsquared'] if 'rsquared' in a else 0,
+                'ac_precision': a['ac_precision'] if 'ac_precision' in a else '',
                 'pubchem_id': '',
                 'url': '/compound_data/{}'.format(z['_id']) if not x['qid'] else '/compound_data/{};qid={}'.format(z['_id'], x['qid'])
             }

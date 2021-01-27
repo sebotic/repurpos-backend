@@ -31,7 +31,7 @@ auth_blueprint = Blueprint('auth', __name__)
 
 data_dir = os.getenv('DATA_DIR')
 
-assay_descrip = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20200618.csv'), header=0, index_col=False, encoding='UTF-8')
+assay_descrip = pd.read_csv(os.path.join(data_dir, 'assay_descriptions_20201218.csv'), header=0, index_col=False, encoding='UTF-8')
 
 # plot_data = pd.read_csv(os.path.join(data_dir, 'assay_data_20200120.csv'), header=0)
 
@@ -281,6 +281,7 @@ def get_dotplot_data(aid):
             temp = {
                 'assay_title': a['assay_title'],
                 'calibr_id': z['_id'],
+                'smiles': x['smiles'] if 'smiles' in x else 0,
                 'name': compound_name,
                 'ac50': a['ac50'] if 'ac50' in a else 1e-10,
                 'assay_type': a['activity_type'] if 'activity_type' in a else '',
@@ -289,7 +290,6 @@ def get_dotplot_data(aid):
                 'ac_precision': a['ac_precision'] if 'ac_precision' in a else '',
                 'pubchem_id': '',
                 'url': '/compound_data/{}'.format(z['_id']) if not x['qid'] else '/compound_data/{};qid={}'.format(z['_id'], x['qid'])
-
             }
             assay_data.append(temp)
     # print(assay_data)

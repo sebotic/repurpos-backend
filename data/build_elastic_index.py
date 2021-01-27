@@ -922,7 +922,9 @@ print(r)
 # generate example_data.py
 
 
-qids = ["Q27286421", "Q27088554", "Q27291538", "Q27077191", "Q15411004"]
+qids = ["Q27286421", "Q27088554", "Q27291538",
+        # "Q27077191",
+        "Q15411004"]
 ikeys = ['WXNRAKRZUCLRBP-UHFFFAOYSA-N',
          'NNBGCSGCRSCFEA-UHFFFAOYSA-N',
          'MPMZSZMDCRPSRF-UHFFFAOYSA-N',

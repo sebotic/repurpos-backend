@@ -4,6 +4,10 @@ venv
 temp
 tmp
 __pycache__
+node_modules
+data/package-lock.json
+setup-windows-service.*
+uninstall-windows-service.*
 
 *.pyc
 *.sqlite
@@ -12,3 +16,4 @@ __pycache__
 env.sh
 migrations
 *.idea
+
